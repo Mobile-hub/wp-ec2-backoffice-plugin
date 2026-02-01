@@ -1,0 +1,11 @@
+/**
+ * Admin Styles for WP EC2 Backoffice Plugin
+ *
+ * @package WP_EC2_Backoffice
+ */
+
+/* TODO: Implement in task 16 */
+
+.wp-ec2-backoffice-wrap {
+    margin: 20px 0;
+}

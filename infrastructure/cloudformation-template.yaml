@@ -1,0 +1,19 @@
+# CloudFormation Template for WP EC2 Backoffice Plugin
+# TODO: Implement in task 20
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'WordPress EC2 Backoffice Plugin - Infrastructure'
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+
+Resources:
+  # TODO: Add resources in task 20
+
+Outputs:
+  # TODO: Add outputs in task 20
+  StackStatus:
+    Description: Stack creation status
+    Value: Created

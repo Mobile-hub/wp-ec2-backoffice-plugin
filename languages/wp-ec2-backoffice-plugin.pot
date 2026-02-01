@@ -1,0 +1,18 @@
+# Copyright (C) 2024 WP EC2 Backoffice Plugin
+# This file is distributed under the MIT License.
+# TODO: Generate complete .pot file in task 19
+
+msgid ""
+msgstr ""
+"Project-Id-Version: WP EC2 Backoffice Plugin 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/your-username/wp-ec2-backoffice-plugin/issues\n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Placeholder - strings will be extracted in task 19
