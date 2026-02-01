@@ -1,0 +1,33 @@
+# Composer
+/vendor/
+composer.lock
+
+# WordPress
+wp-config.php
+.htaccess
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+error_log
+
+# Tests
+/tests/coverage/
+.phpunit.result.cache
+
+# Build
+/build/
+/dist/
+
+# Environment
+.env
+.env.local
