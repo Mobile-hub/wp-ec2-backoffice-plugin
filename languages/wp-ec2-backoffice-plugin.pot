@@ -1,7 +1,5 @@
 # Copyright (C) 2024 WP EC2 Backoffice Plugin
 # This file is distributed under the MIT License.
-# TODO: Generate complete .pot file in task 19
-
 msgid ""
 msgstr ""
 "Project-Id-Version: WP EC2 Backoffice Plugin 1.0.0\n"
@@ -14,5 +12,260 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Manual\n"
 
-# Placeholder - strings will be extracted in task 19
+# Main plugin file - wp-ec2-backoffice-plugin.php
+msgid "WP EC2 Backoffice Plugin: Las dependencias no están instaladas. Por favor ejecuta \"composer install\" en el directorio del plugin."
+msgstr ""
+
+msgid "Este plugin requiere PHP 7.4 o superior."
+msgstr ""
+
+msgid "Error de Activación del Plugin"
+msgstr ""
+
+msgid "Este plugin requiere WordPress 5.0 o superior."
+msgstr ""
+
+msgid "Este plugin requiere la extensión OpenSSL de PHP."
+msgstr ""
+
+# Plugin class - includes/class-plugin.php
+msgid "EC2 Backoffice"
+msgstr ""
+
+msgid "Iniciando instancia..."
+msgstr ""
+
+msgid "Deteniendo instancia..."
+msgstr ""
+
+msgid "Probando conexión..."
+msgstr ""
+
+msgid "Cargando..."
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "Éxito"
+msgstr ""
+
+msgid "Copiado al portapapeles"
+msgstr ""
+
+# UI Controller - includes/class-ui-controller.php
+msgid "No tienes permisos para acceder a esta página."
+msgstr ""
+
+msgid "Acceso y Control"
+msgstr ""
+
+msgid "Configuración"
+msgstr ""
+
+msgid "Por favor configura el plugin en la pestaña Configuración antes de usar los controles."
+msgstr ""
+
+msgid "Control de Instancia"
+msgstr ""
+
+msgid "Estado de la Instancia"
+msgstr ""
+
+msgid "Estado:"
+msgstr ""
+
+msgid "IP Pública:"
+msgstr ""
+
+msgid "El estado se actualiza automáticamente cada 60 segundos."
+msgstr ""
+
+msgid "Controles"
+msgstr ""
+
+msgid "Iniciar Instancia"
+msgstr ""
+
+msgid "Detener Instancia"
+msgstr ""
+
+msgid "Conexión RDP"
+msgstr ""
+
+msgid "Descargar Archivo RDP"
+msgstr ""
+
+msgid "El archivo RDP solo está disponible cuando la instancia está en ejecución."
+msgstr ""
+
+msgid "Contraseña de Windows"
+msgstr ""
+
+msgid "Usuario:"
+msgstr ""
+
+msgid "Contraseña:"
+msgstr ""
+
+msgid "Mostrar"
+msgstr ""
+
+msgid "Copiar"
+msgstr ""
+
+msgid "¡Copiado!"
+msgstr ""
+
+msgid "Configuración de AWS"
+msgstr ""
+
+msgid "Región de AWS"
+msgstr ""
+
+msgid "Ejemplo: us-east-1, eu-west-2"
+msgstr ""
+
+msgid "Access Key ID"
+msgstr ""
+
+msgid "Secret Access Key"
+msgstr ""
+
+msgid "Ingresa nueva clave o deja en blanco para mantener la actual"
+msgstr ""
+
+msgid "La clave se almacena encriptada en la base de datos."
+msgstr ""
+
+msgid "Instance ID"
+msgstr ""
+
+msgid "Ejemplo: i-1234567890abcdef0"
+msgstr ""
+
+msgid "Contraseña del usuario Administrator de Windows."
+msgstr ""
+
+msgid "Guardar Configuración"
+msgstr ""
+
+msgid "Probar Conexión"
+msgstr ""
+
+msgid "Verificación de seguridad fallida."
+msgstr ""
+
+msgid "El plugin no está configurado."
+msgstr ""
+
+msgid "Error al actualizar el grupo de seguridad: "
+msgstr ""
+
+msgid "Instancia iniciada correctamente."
+msgstr ""
+
+msgid "Error al iniciar la instancia: "
+msgstr ""
+
+msgid "Instancia detenida correctamente."
+msgstr ""
+
+msgid "Error al detener la instancia: "
+msgstr ""
+
+msgid "Error al obtener el estado: "
+msgstr ""
+
+msgid "El plugin no está configurado. Por favor guarda la configuración primero."
+msgstr ""
+
+msgid "Conexión exitosa. Credenciales válidas."
+msgstr ""
+
+msgid "Error de conexión: "
+msgstr ""
+
+msgid "Error al obtener el estado de la instancia."
+msgstr ""
+
+msgid "La instancia debe estar en ejecución para descargar el archivo RDP."
+msgstr ""
+
+msgid "No se pudo obtener la IP pública de la instancia."
+msgstr ""
+
+msgid "Error de validación: "
+msgstr ""
+
+msgid "Configuración guardada correctamente."
+msgstr ""
+
+msgid "Error al guardar la configuración."
+msgstr ""
+
+# Configuration Store - includes/class-configuration-store.php
+msgid "Región de AWS es requerida"
+msgstr ""
+
+msgid "Access Key ID es requerido"
+msgstr ""
+
+msgid "Secret Access Key es requerido"
+msgstr ""
+
+msgid "Instance ID es requerido"
+msgstr ""
+
+msgid "Error al encriptar la clave secreta"
+msgstr ""
+
+msgid "Error al desencriptar la clave secreta"
+msgstr ""
+
+# EC2 Manager - includes/class-ec2-manager.php
+msgid "No se pudo iniciar la instancia"
+msgstr ""
+
+msgid "No se pudo detener la instancia"
+msgstr ""
+
+msgid "No se pudo obtener el estado de la instancia"
+msgstr ""
+
+msgid "No se pudo conectar a AWS"
+msgstr ""
+
+msgid "Credenciales de AWS inválidas"
+msgstr ""
+
+msgid "Permisos insuficientes"
+msgstr ""
+
+msgid "Instancia no encontrada"
+msgstr ""
+
+msgid "Límite de solicitudes excedido"
+msgstr ""
+
+# Security Group Manager - includes/class-security-group-manager.php
+msgid "No se pudo determinar la IP actual"
+msgstr ""
+
+msgid "No se pudo obtener el grupo de seguridad"
+msgstr ""
+
+msgid "No se pudo actualizar las reglas del grupo de seguridad"
+msgstr ""
+
+msgid "IP inválida detectada"
+msgstr ""
+
+# IP Detector - includes/class-ip-detector.php
+msgid "No se pudo detectar la dirección IP"
+msgstr ""
+
+msgid "Dirección IP inválida"
+msgstr ""

@@ -1,19 +1,334 @@
-# CloudFormation Template for WP EC2 Backoffice Plugin
-# TODO: Implement in task 20
-
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'WordPress EC2 Backoffice Plugin - Infrastructure'
+Description: 'WordPress EC2 Backoffice Plugin - Windows Server 2022 instance with auto-shutdown and IAM configuration'
 
 Parameters:
   KeyPairName:
     Type: AWS::EC2::KeyPair::KeyName
-    Description: EC2 Key Pair for SSH access
+    Description: EC2 Key Pair for SSH access (optional, for troubleshooting)
+    Default: ''
+  
+  InstanceType:
+    Type: String
+    Description: EC2 instance type
+    Default: t3.medium
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+  
+  WindowsAdminPassword:
+    Type: String
+    Description: Windows Administrator password (minimum 8 characters)
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: '^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};:,.<>?]*$'
+    ConstraintDescription: Must be 8-41 characters and contain only alphanumeric and special characters
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where the instance will be launched
+  
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID where the instance will be launched (must have public IP assignment)
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Instance Configuration
+        Parameters:
+          - InstanceType
+          - KeyPairName
+          - WindowsAdminPassword
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VpcId
+          - SubnetId
 
 Resources:
-  # TODO: Add resources in task 20
+  # Security Group for RDP access (managed by WordPress plugin)
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-rdp-sg'
+      GroupDescription: Security group for RDP access - managed by WordPress plugin
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-rdp-sg'
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
+        - Key: Purpose
+          Value: RDP access control
+
+  # IAM Role for EC2 instance (allows instance to stop itself)
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-instance-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: AllowSelfStop
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:StopInstances
+                  - ec2:DescribeInstances
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'ec2:ResourceTag/aws:cloudformation:stack-name': !Ref AWS::StackName
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-instance-role'
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
+
+  # IAM Instance Profile
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${AWS::StackName}-instance-profile'
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # EC2 Windows Instance
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base}}'
+      InstanceType: !Ref InstanceType
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref EC2SecurityGroup
+          SubnetId: !Ref SubnetId
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 50
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      UserData:
+        Fn::Base64: !Sub |
+          <powershell>
+          # Set Administrator password
+          $Password = ConvertTo-SecureString "${WindowsAdminPassword}" -AsPlainText -Force
+          Get-LocalUser -Name "Administrator" | Set-LocalUser -Password $Password
+          
+          # Enable RDP
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+          # Install AWS CLI
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://awscli.amazonaws.com/AWSCLIV2.msi" -OutFile "$env:TEMP\AWSCLIV2.msi"
+          Start-Process msiexec.exe -ArgumentList "/i $env:TEMP\AWSCLIV2.msi /quiet /norestart" -Wait
+          
+          # Create scripts directory
+          New-Item -Path "C:\Scripts" -ItemType Directory -Force
+          
+          # Create registry key for activity tracking
+          New-Item -Path "HKLM:\SOFTWARE\WP-EC2-AutoShutdown" -Force
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\WP-EC2-AutoShutdown" -Name "LastRDPActivity" -Value (Get-Date).ToString("o")
+          
+          # Create Event Log source
+          New-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -ErrorAction SilentlyContinue
+          
+          # Download auto-shutdown script
+          $ScriptContent = @'
+          # Auto-Shutdown Script for EC2 Windows Instance
+          # Monitors RDP sessions and stops instance after 2 hours of inactivity
+          
+          $ErrorActionPreference = "Stop"
+          $RegistryPath = "HKLM:\SOFTWARE\WP-EC2-AutoShutdown"
+          $LastActivityKey = "LastRDPActivity"
+          $InactivityThresholdHours = 2
+          
+          try {
+              # Check for active RDP sessions
+              $Sessions = qwinsta
+              $ActiveRdpSessions = $Sessions | Select-String "rdp-tcp" | Where-Object { $_ -match "Active" }
+              
+              if ($ActiveRdpSessions) {
+                  # Update last activity timestamp
+                  $CurrentTime = Get-Date
+                  Set-ItemProperty -Path $RegistryPath -Name $LastActivityKey -Value $CurrentTime.ToString("o")
+                  Write-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -EventId 1000 -EntryType Information -Message "Active RDP session detected. Last activity updated to: $CurrentTime"
+              } else {
+                  # Check time since last activity
+                  $LastActivityStr = Get-ItemProperty -Path $RegistryPath -Name $LastActivityKey | Select-Object -ExpandProperty $LastActivityKey
+                  $LastActivity = [DateTime]::Parse($LastActivityStr)
+                  $TimeSinceActivity = (Get-Date) - $LastActivity
+                  
+                  Write-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -EventId 1002 -EntryType Information -Message "No active RDP sessions. Time since last activity: $($TimeSinceActivity.TotalHours) hours"
+                  
+                  if ($TimeSinceActivity.TotalHours -ge $InactivityThresholdHours) {
+                      # Get instance metadata
+                      $InstanceId = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/instance-id" -TimeoutSec 5
+                      $Region = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/placement/region" -TimeoutSec 5
+                      
+                      Write-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -EventId 1001 -EntryType Warning -Message "Stopping instance $InstanceId due to $($TimeSinceActivity.TotalHours) hours of inactivity (threshold: $InactivityThresholdHours hours)"
+                      
+                      # Stop the instance
+                      & "C:\Program Files\Amazon\AWSCLIV2\aws.exe" ec2 stop-instances --instance-ids $InstanceId --region $Region
+                  }
+              }
+          } catch {
+              Write-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -EventId 1003 -EntryType Error -Message "Error in auto-shutdown script: $($_.Exception.Message)"
+          }
+          '@
+          
+          $ScriptContent | Out-File -FilePath "C:\Scripts\auto-shutdown.ps1" -Encoding UTF8
+          
+          # Create scheduled task to run every 15 minutes
+          $Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File C:\Scripts\auto-shutdown.ps1"
+          $Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration ([TimeSpan]::MaxValue)
+          $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+          $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable
+          
+          Register-ScheduledTask -TaskName "WP-EC2-AutoShutdown" -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Automatically stops EC2 instance after 2 hours of RDP inactivity"
+          
+          # Log successful initialization
+          Write-EventLog -LogName Application -Source "WP-EC2-AutoShutdown" -EventId 1004 -EntryType Information -Message "Auto-shutdown system initialized successfully"
+          
+          # Signal CloudFormation that setup is complete
+          cfn-signal.exe -e 0 --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+          </powershell>
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-windows-instance'
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
+        - Key: Purpose
+          Value: Email management with Thunderbird
+        - Key: aws:cloudformation:stack-name
+          Value: !Ref AWS::StackName
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+
+  # IAM User for WordPress plugin (programmatic access only)
+  PluginIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub '${AWS::StackName}-plugin-user'
+      Tags:
+        - Key: Purpose
+          Value: WordPress EC2 Backoffice Plugin
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
+
+  # Access Key for IAM User
+  PluginIAMUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref PluginIAMUser
+
+  # IAM Policy for WordPress plugin user
+  PluginIAMPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-plugin-policy'
+      Users:
+        - !Ref PluginIAMUser
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # EC2 instance control permissions
+          - Sid: EC2InstanceControl
+            Effect: Allow
+            Action:
+              - ec2:StartInstances
+              - ec2:StopInstances
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${EC2Instance}'
+          
+          # Security group management permissions
+          - Sid: SecurityGroupManagement
+            Effect: Allow
+            Action:
+              - ec2:DescribeSecurityGroups
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:RevokeSecurityGroupIngress
+            Resource: !GetAtt EC2SecurityGroup.GroupId
+          
+          # Additional describe permissions (no resource restriction)
+          - Sid: DescribePermissions
+            Effect: Allow
+            Action:
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: '*'
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
 
 Outputs:
-  # TODO: Add outputs in task 20
-  StackStatus:
-    Description: Stack creation status
-    Value: Created
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+  
+  InstancePublicIP:
+    Description: Public IP address of the EC2 instance (available when running)
+    Value: !GetAtt EC2Instance.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+  
+  SecurityGroupId:
+    Description: Security Group ID for RDP access
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+  
+  IAMUserAccessKeyId:
+    Description: Access Key ID for WordPress plugin IAM user
+    Value: !Ref PluginIAMUserAccessKey
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessKeyId'
+  
+  IAMUserSecretAccessKey:
+    Description: Secret Access Key for WordPress plugin IAM user (save this securely)
+    Value: !GetAtt PluginIAMUserAccessKey.SecretAccessKey
+    Export:
+      Name: !Sub '${AWS::StackName}-SecretAccessKey'
+  
+  WindowsAdministratorPassword:
+    Description: Windows Administrator password for RDP connection
+    Value: !Ref WindowsAdminPassword
+  
+  RDPConnectionCommand:
+    Description: Command to connect via RDP (Windows)
+    Value: !Sub 'mstsc /v:${EC2Instance.PublicIp}'
+  
+  StackName:
+    Description: CloudFormation Stack Name
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub '${AWS::StackName}-StackName'

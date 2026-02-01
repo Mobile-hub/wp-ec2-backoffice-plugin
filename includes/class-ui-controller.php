@@ -65,65 +65,467 @@ class UI_Controller {
     }
 
     /**
-     * Render admin page
+     * Render admin page with tabs
      */
     public function render_admin_page() {
-        // TODO: Implement in task 10
-        echo '<div class="wrap"><h1>' . esc_html__('EC2 Backoffice', 'wp-ec2-backoffice-plugin') . '</h1></div>';
+        // Check user capability
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('No tienes permisos para acceder a esta página.', 'wp-ec2-backoffice-plugin'));
+        }
+
+        // Get current tab
+        $current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'access';
+
+        // Handle configuration save
+        if (isset($_POST['save_config']) && check_admin_referer('ec2_save_config', 'ec2_config_nonce')) {
+            $this->handle_save_configuration();
+        }
+
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html__('EC2 Backoffice', 'wp-ec2-backoffice-plugin'); ?></h1>
+            
+            <h2 class="nav-tab-wrapper">
+                <a href="?page=wp-ec2-backoffice&tab=access" class="nav-tab <?php echo $current_tab === 'access' ? 'nav-tab-active' : ''; ?>">
+                    <?php echo esc_html__('Acceso y Control', 'wp-ec2-backoffice-plugin'); ?>
+                </a>
+                <a href="?page=wp-ec2-backoffice&tab=config" class="nav-tab <?php echo $current_tab === 'config' ? 'nav-tab-active' : ''; ?>">
+                    <?php echo esc_html__('Configuración', 'wp-ec2-backoffice-plugin'); ?>
+                </a>
+            </h2>
+
+            <div class="tab-content">
+                <?php
+                if ($current_tab === 'access') {
+                    $this->render_access_tab();
+                } else {
+                    $this->render_config_tab();
+                }
+                ?>
+            </div>
+        </div>
+        <?php
     }
 
     /**
-     * Render access tab
+     * Render access tab with instance controls, status, RDP download, and password display
      */
     public function render_access_tab() {
-        // TODO: Implement in task 10
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            ?>
+            <div class="notice notice-warning">
+                <p><?php echo esc_html__('Por favor configura el plugin en la pestaña Configuración antes de usar los controles.', 'wp-ec2-backoffice-plugin'); ?></p>
+            </div>
+            <?php
+            return;
+        }
+
+        // Get current instance status
+        $status_result = $this->ec2_manager->get_instance_status();
+        $instance_state = 'unknown';
+        $public_ip = '';
+        
+        if ($status_result['success']) {
+            $instance_state = $status_result['data']['state'];
+            $public_ip = $status_result['data']['public_ip'] ?? '';
+        }
+
+        // Determine button states based on instance state
+        $is_transitional = in_array($instance_state, array('pending', 'stopping'));
+        $is_running = $instance_state === 'running';
+        $is_stopped = $instance_state === 'stopped';
+
+        // Get configuration for password display
+        $config = $this->config_store->get_config();
+        $windows_password = $config['windows_password'] ?? '';
+
+        ?>
+        <div class="ec2-access-tab">
+            <h2><?php echo esc_html__('Control de Instancia', 'wp-ec2-backoffice-plugin'); ?></h2>
+            
+            <!-- Instance Status Display -->
+            <div class="ec2-status-section">
+                <h3><?php echo esc_html__('Estado de la Instancia', 'wp-ec2-backoffice-plugin'); ?></h3>
+                <div id="ec2-status-display" class="ec2-status-box">
+                    <p>
+                        <strong><?php echo esc_html__('Estado:', 'wp-ec2-backoffice-plugin'); ?></strong>
+                        <span id="ec2-instance-state" class="ec2-state-<?php echo esc_attr($instance_state); ?>">
+                            <?php echo esc_html(ucfirst($instance_state)); ?>
+                        </span>
+                    </p>
+                    <?php if ($public_ip): ?>
+                    <p>
+                        <strong><?php echo esc_html__('IP Pública:', 'wp-ec2-backoffice-plugin'); ?></strong>
+                        <span id="ec2-public-ip"><?php echo esc_html($public_ip); ?></span>
+                    </p>
+                    <?php endif; ?>
+                    <p class="description">
+                        <?php echo esc_html__('El estado se actualiza automáticamente cada 60 segundos.', 'wp-ec2-backoffice-plugin'); ?>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Instance Control Buttons -->
+            <div class="ec2-controls-section">
+                <h3><?php echo esc_html__('Controles', 'wp-ec2-backoffice-plugin'); ?></h3>
+                <p>
+                    <button type="button" id="ec2-start-btn" class="button button-primary" 
+                            <?php echo ($is_running || $is_transitional) ? 'disabled' : ''; ?>>
+                        <?php echo esc_html__('Iniciar Instancia', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                    <button type="button" id="ec2-stop-btn" class="button" 
+                            <?php echo ($is_stopped || $is_transitional) ? 'disabled' : ''; ?>>
+                        <?php echo esc_html__('Detener Instancia', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                    <span id="ec2-loading" class="spinner" style="display:none;"></span>
+                </p>
+            </div>
+
+            <!-- RDP Download -->
+            <div class="ec2-rdp-section">
+                <h3><?php echo esc_html__('Conexión RDP', 'wp-ec2-backoffice-plugin'); ?></h3>
+                <p>
+                    <button type="button" id="ec2-download-rdp-btn" class="button button-secondary" 
+                            <?php echo !$is_running ? 'disabled' : ''; ?>>
+                        <?php echo esc_html__('Descargar Archivo RDP', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                </p>
+                <p class="description">
+                    <?php echo esc_html__('El archivo RDP solo está disponible cuando la instancia está en ejecución.', 'wp-ec2-backoffice-plugin'); ?>
+                </p>
+            </div>
+
+            <!-- Windows Password Display -->
+            <?php if ($windows_password): ?>
+            <div class="ec2-password-section">
+                <h3><?php echo esc_html__('Contraseña de Windows', 'wp-ec2-backoffice-plugin'); ?></h3>
+                <p>
+                    <strong><?php echo esc_html__('Usuario:', 'wp-ec2-backoffice-plugin'); ?></strong> Administrator
+                </p>
+                <p>
+                    <strong><?php echo esc_html__('Contraseña:', 'wp-ec2-backoffice-plugin'); ?></strong>
+                    <span id="ec2-password-display" class="ec2-password-masked">••••••••••••</span>
+                    <button type="button" id="ec2-toggle-password-btn" class="button button-small">
+                        <?php echo esc_html__('Mostrar', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                    <button type="button" id="ec2-copy-password-btn" class="button button-small">
+                        <?php echo esc_html__('Copiar', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                    <span id="ec2-copy-feedback" style="display:none; color:green; margin-left:10px;">
+                        <?php echo esc_html__('¡Copiado!', 'wp-ec2-backoffice-plugin'); ?>
+                    </span>
+                </p>
+                <input type="hidden" id="ec2-password-value" value="<?php echo esc_attr($windows_password); ?>">
+            </div>
+            <?php endif; ?>
+
+            <!-- AJAX Nonce -->
+            <input type="hidden" id="ec2-ajax-nonce" value="<?php echo esc_attr(wp_create_nonce('ec2_ajax_nonce')); ?>">
+        </div>
+        <?php
     }
 
     /**
-     * Render config tab
+     * Render config tab with configuration form
      */
     public function render_config_tab() {
-        // TODO: Implement in task 10
+        // Get current configuration
+        $config = $this->config_store->get_config();
+        
+        // Mask the secret access key for display
+        $masked_secret = '';
+        if (!empty($config['aws_secret_access_key'])) {
+            $masked_secret = str_repeat('•', 20);
+        }
+
+        ?>
+        <div class="ec2-config-tab">
+            <h2><?php echo esc_html__('Configuración de AWS', 'wp-ec2-backoffice-plugin'); ?></h2>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field('ec2_save_config', 'ec2_config_nonce'); ?>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="aws_region"><?php echo esc_html__('Región de AWS', 'wp-ec2-backoffice-plugin'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="aws_region" name="aws_region" 
+                                   value="<?php echo esc_attr($config['aws_region'] ?? ''); ?>" 
+                                   class="regular-text" required>
+                            <p class="description">
+                                <?php echo esc_html__('Ejemplo: us-east-1, eu-west-2', 'wp-ec2-backoffice-plugin'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="aws_access_key_id"><?php echo esc_html__('Access Key ID', 'wp-ec2-backoffice-plugin'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="aws_access_key_id" name="aws_access_key_id" 
+                                   value="<?php echo esc_attr($config['aws_access_key_id'] ?? ''); ?>" 
+                                   class="regular-text" required>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="aws_secret_access_key"><?php echo esc_html__('Secret Access Key', 'wp-ec2-backoffice-plugin'); ?></label>
+                        </th>
+                        <td>
+                            <input type="password" id="aws_secret_access_key" name="aws_secret_access_key" 
+                                   value="<?php echo esc_attr($masked_secret); ?>" 
+                                   class="regular-text" 
+                                   placeholder="<?php echo esc_attr__('Ingresa nueva clave o deja en blanco para mantener la actual', 'wp-ec2-backoffice-plugin'); ?>">
+                            <p class="description">
+                                <?php echo esc_html__('La clave se almacena encriptada en la base de datos.', 'wp-ec2-backoffice-plugin'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="ec2_instance_id"><?php echo esc_html__('Instance ID', 'wp-ec2-backoffice-plugin'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="ec2_instance_id" name="ec2_instance_id" 
+                                   value="<?php echo esc_attr($config['ec2_instance_id'] ?? ''); ?>" 
+                                   class="regular-text" required>
+                            <p class="description">
+                                <?php echo esc_html__('Ejemplo: i-1234567890abcdef0', 'wp-ec2-backoffice-plugin'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="windows_password"><?php echo esc_html__('Contraseña de Windows', 'wp-ec2-backoffice-plugin'); ?></label>
+                        </th>
+                        <td>
+                            <input type="password" id="windows_password" name="windows_password" 
+                                   value="<?php echo esc_attr($config['windows_password'] ?? ''); ?>" 
+                                   class="regular-text">
+                            <p class="description">
+                                <?php echo esc_html__('Contraseña del usuario Administrator de Windows.', 'wp-ec2-backoffice-plugin'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <input type="submit" name="save_config" class="button button-primary" 
+                           value="<?php echo esc_attr__('Guardar Configuración', 'wp-ec2-backoffice-plugin'); ?>">
+                    <button type="button" id="ec2-test-connection-btn" class="button button-secondary">
+                        <?php echo esc_html__('Probar Conexión', 'wp-ec2-backoffice-plugin'); ?>
+                    </button>
+                    <span id="ec2-test-loading" class="spinner" style="display:none;"></span>
+                </p>
+            </form>
+
+            <div id="ec2-test-result" style="margin-top:20px;"></div>
+
+            <!-- AJAX Nonce -->
+            <input type="hidden" id="ec2-ajax-nonce" value="<?php echo esc_attr(wp_create_nonce('ec2_ajax_nonce')); ?>">
+        </div>
+        <?php
     }
 
     /**
      * Handle AJAX request to start instance
      */
     public function handle_ajax_start_instance() {
-        // TODO: Implement in task 11
-        wp_send_json_error('Not implemented');
+        // Verify nonce and capability
+        if (!$this->verify_nonce_and_capability()) {
+            wp_send_json_error(array('message' => __('Verificación de seguridad fallida.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            wp_send_json_error(array('message' => __('El plugin no está configurado.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Get instance ID from configuration
+        $config = $this->config_store->get_config();
+        $instance_id = $config['ec2_instance_id'];
+
+        // Update security group first
+        $sg_result = $this->sg_manager->update_rdp_access($instance_id);
+        
+        if (!$sg_result['success']) {
+            wp_send_json_error(array(
+                'message' => __('Error al actualizar el grupo de seguridad: ', 'wp-ec2-backoffice-plugin') . $sg_result['error']
+            ));
+            return;
+        }
+
+        // Start the instance
+        $start_result = $this->ec2_manager->start_instance();
+        
+        if ($start_result['success']) {
+            wp_send_json_success(array(
+                'message' => __('Instancia iniciada correctamente.', 'wp-ec2-backoffice-plugin'),
+                'data' => $start_result['data']
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => __('Error al iniciar la instancia: ', 'wp-ec2-backoffice-plugin') . $start_result['error']
+            ));
+        }
     }
 
     /**
      * Handle AJAX request to stop instance
      */
     public function handle_ajax_stop_instance() {
-        // TODO: Implement in task 11
-        wp_send_json_error('Not implemented');
+        // Verify nonce and capability
+        if (!$this->verify_nonce_and_capability()) {
+            wp_send_json_error(array('message' => __('Verificación de seguridad fallida.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            wp_send_json_error(array('message' => __('El plugin no está configurado.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Stop the instance
+        $stop_result = $this->ec2_manager->stop_instance();
+        
+        if ($stop_result['success']) {
+            wp_send_json_success(array(
+                'message' => __('Instancia detenida correctamente.', 'wp-ec2-backoffice-plugin'),
+                'data' => $stop_result['data']
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => __('Error al detener la instancia: ', 'wp-ec2-backoffice-plugin') . $stop_result['error']
+            ));
+        }
     }
 
     /**
      * Handle AJAX request to get status
      */
     public function handle_ajax_get_status() {
-        // TODO: Implement in task 11
-        wp_send_json_error('Not implemented');
+        // Verify nonce and capability
+        if (!$this->verify_nonce_and_capability()) {
+            wp_send_json_error(array('message' => __('Verificación de seguridad fallida.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            wp_send_json_error(array('message' => __('El plugin no está configurado.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Get instance status
+        $status_result = $this->ec2_manager->get_instance_status();
+        
+        if ($status_result['success']) {
+            wp_send_json_success(array(
+                'data' => $status_result['data']
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => __('Error al obtener el estado: ', 'wp-ec2-backoffice-plugin') . $status_result['error']
+            ));
+        }
     }
 
     /**
      * Handle AJAX request to test connection
      */
     public function handle_ajax_test_connection() {
-        // TODO: Implement in task 11
-        wp_send_json_error('Not implemented');
+        // Verify nonce and capability
+        if (!$this->verify_nonce_and_capability()) {
+            wp_send_json_error(array('message' => __('Verificación de seguridad fallida.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            wp_send_json_error(array('message' => __('El plugin no está configurado. Por favor guarda la configuración primero.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        // Test connection
+        $test_result = $this->ec2_manager->test_connection();
+        
+        if ($test_result['success']) {
+            wp_send_json_success(array(
+                'message' => __('Conexión exitosa. Credenciales válidas.', 'wp-ec2-backoffice-plugin'),
+                'data' => $test_result['data']
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => __('Error de conexión: ', 'wp-ec2-backoffice-plugin') . $test_result['error']
+            ));
+        }
     }
 
     /**
      * Handle AJAX request to download RDP file
      */
     public function handle_ajax_download_rdp() {
-        // TODO: Implement in task 11
-        wp_send_json_error('Not implemented');
+        // Verify nonce and capability
+        if (!$this->verify_nonce_and_capability()) {
+            wp_die(esc_html__('Verificación de seguridad fallida.', 'wp-ec2-backoffice-plugin'));
+            return;
+        }
+
+        // Check if plugin is configured
+        if (!$this->config_store->is_configured()) {
+            wp_die(esc_html__('El plugin no está configurado.', 'wp-ec2-backoffice-plugin'));
+            return;
+        }
+
+        // Get instance status to verify it's running and get public IP
+        $status_result = $this->ec2_manager->get_instance_status();
+        
+        if (!$status_result['success']) {
+            wp_die(esc_html__('Error al obtener el estado de la instancia.', 'wp-ec2-backoffice-plugin'));
+            return;
+        }
+
+        $instance_data = $status_result['data'];
+        
+        // Check if instance is running
+        if ($instance_data['state'] !== 'running') {
+            wp_die(esc_html__('La instancia debe estar en ejecución para descargar el archivo RDP.', 'wp-ec2-backoffice-plugin'));
+            return;
+        }
+
+        // Check if public IP is available
+        if (empty($instance_data['public_ip'])) {
+            wp_die(esc_html__('No se pudo obtener la IP pública de la instancia.', 'wp-ec2-backoffice-plugin'));
+            return;
+        }
+
+        // Generate RDP file
+        $public_ip = $instance_data['public_ip'];
+        $instance_id = $instance_data['instance_id'];
+        
+        $rdp_content = $this->rdp_generator->generate_rdp_file($public_ip, $instance_id);
+        $rdp_filename = $this->rdp_generator->get_rdp_filename($instance_id);
+
+        // Send headers for file download
+        header('Content-Type: application/x-rdp');
+        header('Content-Disposition: attachment; filename="' . $rdp_filename . '"');
+        header('Content-Length: ' . strlen($rdp_content));
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Expires: 0');
+
+        // Output RDP content
+        echo $rdp_content;
+        exit;
     }
 
     /**
@@ -132,7 +534,100 @@ class UI_Controller {
      * @return bool True if valid, false otherwise
      */
     private function verify_nonce_and_capability() {
-        // TODO: Implement in task 11
-        return false;
+        // Check nonce
+        if (!isset($_REQUEST['nonce']) || !wp_verify_nonce($_REQUEST['nonce'], 'ec2_ajax_nonce')) {
+            return false;
+        }
+
+        // Check user capability
+        if (!current_user_can('manage_options')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Handle configuration save from POST request
+     *
+     * @return void
+     */
+    private function handle_save_configuration() {
+        // Get POST data
+        $config_data = array(
+            'aws_region' => isset($_POST['aws_region']) ? sanitize_text_field($_POST['aws_region']) : '',
+            'aws_access_key_id' => isset($_POST['aws_access_key_id']) ? sanitize_text_field($_POST['aws_access_key_id']) : '',
+            'ec2_instance_id' => isset($_POST['ec2_instance_id']) ? sanitize_text_field($_POST['ec2_instance_id']) : '',
+        );
+
+        // Handle secret access key - only update if not masked
+        if (isset($_POST['aws_secret_access_key']) && !empty($_POST['aws_secret_access_key'])) {
+            $secret_key = $_POST['aws_secret_access_key'];
+            // Check if it's not the masked value
+            if (strpos($secret_key, '•') === false) {
+                $config_data['aws_secret_access_key'] = sanitize_text_field($secret_key);
+            } else {
+                // Keep existing secret key
+                $existing_config = $this->config_store->get_config();
+                if (!empty($existing_config['aws_secret_access_key'])) {
+                    $config_data['aws_secret_access_key'] = $existing_config['aws_secret_access_key'];
+                }
+            }
+        } else {
+            // Keep existing secret key if field is empty
+            $existing_config = $this->config_store->get_config();
+            if (!empty($existing_config['aws_secret_access_key'])) {
+                $config_data['aws_secret_access_key'] = $existing_config['aws_secret_access_key'];
+            }
+        }
+
+        // Handle Windows password
+        if (isset($_POST['windows_password']) && !empty($_POST['windows_password'])) {
+            $config_data['windows_password'] = sanitize_text_field($_POST['windows_password']);
+        } else {
+            // Keep existing password if field is empty
+            $existing_config = $this->config_store->get_config();
+            if (!empty($existing_config['windows_password'])) {
+                $config_data['windows_password'] = $existing_config['windows_password'];
+            }
+        }
+
+        // Validate configuration
+        $validation = $this->config_store->validate_config($config_data);
+        
+        if (!$validation['valid']) {
+            // Display error notice
+            add_settings_error(
+                'ec2_config',
+                'ec2_config_error',
+                __('Error de validación: ', 'wp-ec2-backoffice-plugin') . implode(', ', $validation['errors']),
+                'error'
+            );
+            return;
+        }
+
+        // Save configuration
+        $save_result = $this->config_store->save_config($config_data);
+        
+        if ($save_result) {
+            // Display success notice
+            add_settings_error(
+                'ec2_config',
+                'ec2_config_success',
+                __('Configuración guardada correctamente.', 'wp-ec2-backoffice-plugin'),
+                'success'
+            );
+        } else {
+            // Display error notice
+            add_settings_error(
+                'ec2_config',
+                'ec2_config_error',
+                __('Error al guardar la configuración.', 'wp-ec2-backoffice-plugin'),
+                'error'
+            );
+        }
+
+        // Display admin notices
+        settings_errors('ec2_config');
     }
 }

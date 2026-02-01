@@ -51,8 +51,12 @@ class Response_Model {
      * @return self
      */
     public static function success($data) {
-        // TODO: Implement in task 8
-        return new self();
+        $response = new self();
+        $response->success = true;
+        $response->data = $data;
+        $response->error = null;
+        $response->error_code = null;
+        return $response;
     }
 
     /**
@@ -63,8 +67,12 @@ class Response_Model {
      * @return self
      */
     public static function error(string $message, string $code = '') {
-        // TODO: Implement in task 8
-        return new self();
+        $response = new self();
+        $response->success = false;
+        $response->data = null;
+        $response->error = $message;
+        $response->error_code = $code;
+        return $response;
     }
 
     /**
@@ -73,7 +81,11 @@ class Response_Model {
      * @return string JSON representation
      */
     public function to_json() {
-        // TODO: Implement in task 8
-        return '';
+        return json_encode(array(
+            'success' => $this->success,
+            'data' => $this->data,
+            'error' => $this->error,
+            'error_code' => $this->error_code
+        ));
     }
 }

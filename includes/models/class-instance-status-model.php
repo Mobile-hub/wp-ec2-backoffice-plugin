@@ -64,8 +64,7 @@ class Instance_Status_Model {
      * @return bool
      */
     public function is_running() {
-        // TODO: Implement in task 8
-        return false;
+        return $this->state === 'running';
     }
 
     /**
@@ -74,8 +73,7 @@ class Instance_Status_Model {
      * @return bool
      */
     public function is_stopped() {
-        // TODO: Implement in task 8
-        return false;
+        return $this->state === 'stopped';
     }
 
     /**
@@ -84,8 +82,7 @@ class Instance_Status_Model {
      * @return bool
      */
     public function is_transitional() {
-        // TODO: Implement in task 8
-        return false;
+        return in_array($this->state, array('pending', 'stopping'), true);
     }
 
     /**
@@ -94,7 +91,13 @@ class Instance_Status_Model {
      * @return array Instance status as array
      */
     public function to_array() {
-        // TODO: Implement in task 8
-        return array();
+        return array(
+            'instance_id' => $this->instance_id,
+            'state' => $this->state,
+            'public_ip' => $this->public_ip,
+            'private_ip' => $this->private_ip,
+            'instance_type' => $this->instance_type,
+            'tags' => $this->tags
+        );
     }
 }
