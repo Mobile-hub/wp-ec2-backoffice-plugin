@@ -1,35 +1,17 @@
 <?php
-/**
- * Plugin Name: WP EC2 Backoffice Plugin
- * Description: Gestiona una instancia EC2 de Windows desde el área de administración de WordPress. Permite iniciar/detener la instancia, gestionar reglas de seguridad automáticamente y descargar archivos de conexión RDP.
- * Version: 1.0.0
- * Author: WP EC2 Backoffice Plugin Contributors
- * License: MIT
- * License URI: https://opensource.org/licenses/MIT
- * Text Domain: wp-ec2-backoffice-plugin
- * Domain Path: /languages
- * Requires at least: 5.0
- * Requires PHP: 7.4
- */
 
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Define plugin constants
-define('WP_EC2_BACKOFFICE_VERSION', '1.0.0');
-define('WP_EC2_BACKOFFICE_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('WP_EC2_BACKOFFICE_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('WP_EC2_BACKOFFICE_PLUGIN_BASENAME', plugin_basename(__FILE__));
-
 // Require Composer autoloader
-if (file_exists(WP_EC2_BACKOFFICE_PLUGIN_DIR . 'vendor/autoload.php')) {
-    require_once WP_EC2_BACKOFFICE_PLUGIN_DIR . 'vendor/autoload.php';
+if (file_exists(WP_EC2_BACKOFFICE_SRC_DIR . 'vendor/autoload.php')) {
+    require_once WP_EC2_BACKOFFICE_SRC_DIR . 'vendor/autoload.php';
 }
 
 // Require main plugin class
-require_once WP_EC2_BACKOFFICE_PLUGIN_DIR . 'includes/class-plugin.php';
+require_once WP_EC2_BACKOFFICE_SRC_DIR . 'includes/class-plugin.php';
 
 /**
  * Initialize the plugin

@@ -154,7 +154,7 @@ class Plugin {
         // Enqueue CSS
         wp_enqueue_style(
             'wp-ec2-backoffice-admin',
-            WP_EC2_BACKOFFICE_PLUGIN_URL . 'admin/css/admin-styles.css',
+            WP_EC2_BACKOFFICE_SRC_URL . 'admin/css/admin-styles.css',
             array(),
             WP_EC2_BACKOFFICE_VERSION
         );
@@ -162,7 +162,7 @@ class Plugin {
         // Enqueue JavaScript
         wp_enqueue_script(
             'wp-ec2-backoffice-admin',
-            WP_EC2_BACKOFFICE_PLUGIN_URL . 'admin/js/admin-scripts.js',
+            WP_EC2_BACKOFFICE_SRC_URL . 'admin/js/admin-scripts.js',
             array('jquery'),
             WP_EC2_BACKOFFICE_VERSION,
             true
@@ -206,7 +206,7 @@ class Plugin {
         load_plugin_textdomain(
             'wp-ec2-backoffice-plugin',
             false,
-            dirname(WP_EC2_BACKOFFICE_PLUGIN_BASENAME) . '/languages'
+            dirname(WP_EC2_BACKOFFICE_PLUGIN_BASENAME) . '/src/languages'
         );
     }
 }
