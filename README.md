@@ -76,26 +76,26 @@ Or from the WordPress admin panel:
 2. Find **WP EC2 Backoffice Plugin**
 3. Click **Activate**
 
-## Configuración
+## Configuration
 
-### Configuración Inicial
+### Initial setup
 
-1. En el panel de administración de WordPress, ve a **EC2 Backoffice** en el menú lateral
-2. Haz clic en la pestaña **Configuración**
-3. Completa los siguientes campos con los valores obtenidos del despliegue de CloudFormation:
+1. In the WordPress admin panel, go to **EC2 Backoffice** in the sidebar.
+2. Open the **Configuration** tab.
+3. Fill in the values produced by the CloudFormation deployment:
 
-   - **Región de AWS**: La región donde desplegaste la infraestructura (ej: `us-east-1`)
-   - **Access Key ID**: El Access Key ID del usuario IAM creado
-   - **Secret Access Key**: El Secret Access Key del usuario IAM
-   - **Instance ID**: El ID de la instancia EC2 (ej: `i-1234567890abcdef0`)
-   - **Contraseña de Windows**: La contraseña del usuario Administrator de Windows
+   - **AWS Region**: The region where you deployed the infrastructure (for example `us-east-1`)
+   - **Access Key ID**: The IAM access key ID created for the plugin
+   - **Secret Access Key**: The IAM secret access key created for the plugin
+   - **Instance ID**: The EC2 instance ID (for example `i-1234567890abcdef0`)
+   - **Windows Password**: The Windows Administrator password for the instance
 
-4. Haz clic en **Guardar Configuración**
-5. Haz clic en **Probar Conexión** para verificar que las credenciales son correctas
+4. Click **Save Configuration**.
+5. Click **Test Connection** to verify that the credentials are valid.
 
-### Obtener los Valores de CloudFormation
+### Retrieve the CloudFormation values
 
-Después de desplegar el stack de CloudFormation, puedes obtener los valores necesarios:
+After the CloudFormation stack is deployed, you can retrieve the required values with:
 
 ```bash
 aws cloudformation describe-stacks \
@@ -103,186 +103,175 @@ aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs'
 ```
 
-O desde la consola de AWS:
-1. Ve a **CloudFormation** → **Stacks**
-2. Selecciona tu stack
-3. Haz clic en la pestaña **Outputs**
+Or from the AWS Console:
 
-## Uso
+1. Go to **CloudFormation** → **Stacks**
+2. Select your stack
+3. Open the **Outputs** tab
 
-### Iniciar la Instancia
+## Usage
 
-1. Ve a **EC2 Backoffice** en el menú de administración de WordPress
-2. En la pestaña **Acceso y Control**, verás el estado actual de la instancia
-3. Haz clic en **Iniciar Instancia**
-4. El plugin automáticamente:
-   - Detectará tu dirección IP pública actual
-   - Actualizará las reglas del grupo de seguridad para permitir acceso RDP desde tu IP
-   - Iniciará la instancia EC2
-5. Espera a que el estado cambie a **running** (esto puede tomar 1-2 minutos)
+### Start the instance
 
-### Conectarse por RDP
+1. Open **EC2 Backoffice** in the WordPress admin menu.
+2. In the **Access and Control** tab, review the current instance status.
+3. Click **Start Instance**.
+4. The plugin will:
+   - Detect your current public IP address
+   - Update the security group so RDP is only allowed from your current IP
+   - Start the EC2 instance
+5. Wait until the state changes to **running**. This usually takes 1–2 minutes.
 
-Una vez que la instancia esté en estado **running**:
+### Connect over RDP
 
-1. Haz clic en **Descargar Archivo RDP**
-2. Abre el archivo descargado con tu cliente de Escritorio Remoto
-3. Cuando se te solicite, usa las siguientes credenciales:
-   - **Usuario**: `Administrator`
-   - **Contraseña**: La contraseña mostrada en la sección "Contraseña de Windows" (puedes copiarla con el botón de copiar)
+Once the instance is **running**:
 
-### Detener la Instancia
+1. Click **Download RDP File**.
+2. Open the downloaded file with your RDP client.
+3. When prompted, use:
+   - **Username**: `Administrator`
+   - **Password**: The Windows password configured in the plugin
 
-Cuando termines de usar la instancia:
+### Stop the instance
 
-1. Cierra la sesión de Escritorio Remoto
-2. En el panel de WordPress, haz clic en **Detener Instancia**
-3. La instancia se detendrá y dejarás de incurrir en costos de cómputo
+When you are done using the instance:
 
-**Nota**: La instancia también se detendrá automáticamente después de 2 horas sin sesiones RDP activas, gracias al script de auto-apagado.
+1. Close your Remote Desktop session.
+2. In WordPress, click **Stop Instance**.
+3. The instance will stop and compute charges will stop accruing.
 
-### Monitoreo del Estado
+> The instance can also stop automatically after 2 hours without active RDP sessions, depending on the infrastructure configuration.
 
-El plugin actualiza automáticamente el estado de la instancia cada 10 segundos mientras la página está abierta. Los estados posibles son:
+### Status monitoring
 
-- **stopped**: La instancia está detenida (no genera costos de cómputo)
-- **pending**: La instancia se está iniciando
-- **running**: La instancia está activa y lista para conexión RDP
-- **stopping**: La instancia se está deteniendo
-- **terminated**: La instancia ha sido terminada (no debería ocurrir en uso normal)
+The plugin refreshes the instance status automatically while the admin page is open. Supported states include:
+
+- **stopped**
+- **pending**
+- **running**
+- **stopping**
+- **terminated**
 
 ## Troubleshooting
 
-### Error: "No se pudo determinar la IP actual"
+### Error: "Could not determine the current IP address"
 
-**Causa**: El plugin no puede detectar tu dirección IP pública.
+**Cause**: The plugin cannot detect a valid public client IP.
 
-**Solución**:
-- Verifica que tu servidor WordPress tenga acceso a internet
-- Si estás detrás de un proxy o firewall corporativo, contacta a tu administrador de red
-- Verifica que las variables `$_SERVER['REMOTE_ADDR']` o `$_SERVER['HTTP_X_FORWARDED_FOR']` estén disponibles
+**Solution**:
+- Verify that your WordPress host can access the internet
+- If your site is behind a trusted reverse proxy, make sure your proxy configuration is explicit and reliable
+- Verify that `$_SERVER['REMOTE_ADDR']` is available on the server
 
-### Error: "Credenciales de AWS inválidas"
+### Error: "Invalid AWS credentials"
 
-**Causa**: El Access Key ID o Secret Access Key son incorrectos.
+**Cause**: The configured access key or secret key is invalid.
 
-**Solución**:
-1. Ve a la pestaña **Configuración**
-2. Verifica que hayas copiado correctamente las credenciales del output de CloudFormation
-3. Asegúrate de no haber incluido espacios adicionales al copiar
-4. Haz clic en **Probar Conexión** para verificar
+**Solution**:
+1. Open the **Configuration** tab.
+2. Verify the credentials copied from the CloudFormation outputs or Secrets Manager.
+3. Make sure no leading or trailing spaces were pasted.
+4. Click **Test Connection** again.
 
-### Error: "No tienes permisos suficientes"
+### Error: "Insufficient permissions"
 
-**Causa**: El usuario IAM no tiene los permisos necesarios.
+**Cause**: The IAM user does not have the required permissions.
 
-**Solución**:
-- Verifica que el stack de CloudFormation se haya desplegado correctamente
-- Revisa que las políticas IAM estén adjuntas al usuario
-- Consulta la [documentación de infraestructura](infrastructure/README.md)
+**Solution**:
+- Verify that the CloudFormation stack completed successfully
+- Confirm that the IAM policy is attached as expected
+- Review the infrastructure documentation in [infrastructure/README.md](infrastructure/README.md)
 
-### La instancia no inicia
+### The instance does not start
 
-**Causa**: Puede haber varios motivos.
+**Cause**: Several AWS-side issues can cause this.
 
-**Solución**:
-1. Verifica el estado de la instancia en la consola de AWS EC2
-2. Revisa los logs de CloudWatch para la instancia
-3. Asegúrate de que la instancia no esté en estado `terminated`
-4. Verifica que no hayas alcanzado límites de servicio de AWS
+**Solution**:
+1. Check the instance status in the AWS EC2 console.
+2. Review any relevant CloudWatch logs.
+3. Make sure the instance has not been terminated.
+4. Check whether your AWS account hit service quotas.
 
-### No puedo conectarme por RDP
+### RDP connection fails
 
-**Causa**: Las reglas del grupo de seguridad pueden no estar configuradas correctamente.
+**Cause**: The security group rule or your client network may be blocking access.
 
-**Solución**:
-1. Verifica que tu IP actual sea la misma desde la que intentas conectarte
-2. Si tu IP cambió (ej: conexión móvil), inicia la instancia nuevamente desde el plugin
-3. Verifica en la consola de AWS que el grupo de seguridad tenga una regla para el puerto 3389 desde tu IP
-4. Asegúrate de que tu firewall local permita conexiones RDP salientes
+**Solution**:
+1. Confirm that your current public IP matches the one expected by the plugin.
+2. If your IP changed, start the instance again so the rule is refreshed.
+3. Verify in AWS that port 3389 is allowed from your current IP.
+4. Confirm that your local firewall allows outbound RDP traffic.
 
-### Error: "Las dependencias no están instaladas"
+### Error: "Dependencies are not installed"
 
-**Causa**: El AWS SDK para PHP no está instalado.
+**Cause**: The AWS SDK for PHP is missing.
 
-**Solución**:
+**Solution**:
 ```bash
 cd /path/to/wordpress/wp-content/plugins/wp-ec2-backoffice-plugin
-composer install --no-dev
+composer install --working-dir=src --no-dev
 ```
 
-### La instancia no se detiene automáticamente
+### Automatic shutdown does not trigger
 
-**Causa**: El script de auto-apagado puede no estar funcionando correctamente.
+**Cause**: The auto-shutdown script or scheduled task is not running as expected.
 
-**Solución**:
-1. Conéctate a la instancia por RDP
-2. Abre el Visor de Eventos de Windows (Event Viewer)
-3. Ve a **Registros de Windows** → **Aplicación**
-4. Busca eventos con origen "WP-EC2-AutoShutdown"
-5. Verifica que el script se esté ejecutando cada 15 minutos
-6. Si no hay eventos, verifica que la tarea programada esté configurada correctamente en el Programador de Tareas de Windows
+**Solution**:
+1. Connect to the instance over RDP.
+2. Open Event Viewer.
+3. Review **Windows Logs** → **Application**.
+4. Filter for the `WP-EC2-AutoShutdown` source.
+5. Confirm that the task is running every 15 minutes.
+6. If necessary, inspect the Windows Task Scheduler configuration.
 
-## Seguridad
+## Security Notes
 
-### Mejores Prácticas
+### Recommended practices
 
-1. **Usa HTTPS**: Siempre accede al panel de WordPress a través de HTTPS para proteger las credenciales en tránsito
-2. **Limita el acceso**: Solo otorga acceso al plugin a usuarios administradores de confianza
-3. **Rota credenciales**: Cambia periódicamente las credenciales del usuario IAM
-4. **Monitorea el uso**: Revisa regularmente los logs de CloudWatch para detectar actividad inusual
-5. **Mantén actualizado**: Actualiza el plugin y WordPress regularmente
+1. Use HTTPS for WordPress admin access.
+2. Restrict plugin access to trusted administrators only.
+3. Rotate IAM credentials periodically.
+4. Monitor AWS usage and logs regularly.
+5. Keep WordPress, PHP, and the plugin dependencies updated.
 
-### Almacenamiento de Credenciales
+### Credential storage
 
-- El Secret Access Key se almacena encriptado en la base de datos de WordPress usando AES-256-CBC
-- La clave de encriptación se deriva de las sales de WordPress (`wp_salt()`)
-- Las credenciales nunca se registran en logs ni se muestran en mensajes de error
+- The AWS secret access key is encrypted before being stored in WordPress.
+- The encryption key is derived from WordPress salts.
+- Sensitive values are no longer rendered directly into the admin DOM on page load.
 
-### Acceso a la Instancia
+### Instance access
 
-- Solo tu IP actual puede acceder a la instancia por RDP
-- Las reglas del grupo de seguridad se actualizan automáticamente cada vez que inicias la instancia
-- Las reglas antiguas se eliminan automáticamente para evitar acumulación de IPs permitidas
+- RDP access is restricted to the current public IP detected by the plugin.
+- Security group rules are refreshed automatically when the instance is started.
+- Old plugin-managed rules are removed to avoid stale IP allow-lists.
 
-## Infraestructura
+## Infrastructure
 
-Ver [infrastructure/README.md](infrastructure/README.md) para instrucciones de despliegue de la infraestructura AWS.
+See [infrastructure/README.md](infrastructure/README.md) for deployment details.
 
-## Desarrollo
+## Development
 
-### Estructura del Proyecto
-
-```
-wp-ec2-backoffice-plugin/
-├── wp-ec2-backoffice-plugin.php  # Archivo principal del plugin
-├── composer.json                  # Dependencias
-├── includes/                      # Clases PHP
-├── admin/                         # Assets de administración
-├── languages/                     # Archivos de traducción
-├── infrastructure/                # Templates de CloudFormation
-└── tests/                         # Tests unitarios y de propiedades
-```
-
-### Ejecutar Tests
+### Run tests
 
 ```bash
-composer test
+composer install --working-dir=src
+src/vendor/bin/phpunit --configuration src/phpunit.xml
 ```
 
-## Licencia
+## License
 
-Este proyecto está licenciado bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para más detalles.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-## Contribuir
+## Contributing
 
-Las contribuciones son bienvenidas. Por favor, abre un issue o pull request en GitHub.
+Contributions are welcome. Please open an issue or a pull request on GitHub.
 
-## Soporte
+## Support
 
-Para reportar bugs o solicitar funcionalidades, por favor abre un issue en GitHub.
+To report a bug or request a feature, open an issue on GitHub.
 
-## Agradecimientos
+## Acknowledgements
 
 - AWS SDK for PHP
 - WordPress Plugin API
