@@ -1,12 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'WordPress EC2 Backoffice Plugin - Windows Server 2022 instance with auto-shutdown and IAM configuration'
+Description: 'WordPress EC2 Backoffice Plugin - Minimal Windows Server instance with auto-shutdown (eu-west-1)'
 
 Parameters:
-  KeyPairName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: EC2 Key Pair for SSH access (optional, for troubleshooting)
-    Default: ''
-  
   InstanceType:
     Type: String
     Description: EC2 instance type
@@ -17,15 +12,6 @@ Parameters:
       - t3.large
       - t3.xlarge
   
-  WindowsAdminPassword:
-    Type: String
-    Description: Windows Administrator password (minimum 8 characters)
-    NoEcho: true
-    MinLength: 8
-    MaxLength: 41
-    AllowedPattern: '^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};:,.<>?]*$'
-    ConstraintDescription: Must be 8-41 characters and contain only alphanumeric and special characters
-  
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: VPC ID where the instance will be launched
@@ -33,6 +19,11 @@ Parameters:
   SubnetId:
     Type: AWS::EC2::Subnet::Id
     Description: Subnet ID where the instance will be launched (must have public IP assignment)
+  
+  KeyPairPublicKey:
+    Type: String
+    Description: Public key material for the EC2 KeyPair (generate with scripts/generate-keypair.sh or scripts/generate-keypair.ps1)
+    NoEcho: false
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -41,13 +32,15 @@ Metadata:
           default: Instance Configuration
         Parameters:
           - InstanceType
-          - KeyPairName
-          - WindowsAdminPassword
       - Label:
           default: Network Configuration
         Parameters:
           - VpcId
           - SubnetId
+      - Label:
+          default: Security Configuration
+        Parameters:
+          - KeyPairPublicKey
 
 Resources:
   # Security Group for RDP access (managed by WordPress plugin)
@@ -68,6 +61,39 @@ Resources:
           Value: wp-ec2-backoffice-plugin
         - Key: Purpose
           Value: RDP access control
+
+  # EC2 KeyPair for Windows password decryption
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub '${AWS::StackName}-keypair'
+      KeyType: rsa
+      PublicKeyMaterial: !Ref KeyPairPublicKey
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-keypair'
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
+
+  # Secrets Manager Secret to store IAM credentials
+  CredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}-credentials'
+      Description: 'IAM credentials for WordPress EC2 Backoffice Plugin'
+      SecretString: !Sub |
+        {
+          "AccessKeyId": "${PluginIAMUserAccessKey}",
+          "SecretAccessKey": "${PluginIAMUserAccessKey.SecretAccessKey}",
+          "Region": "${AWS::Region}",
+          "InstanceId": "${EC2Instance}",
+          "SecurityGroupId": "${EC2SecurityGroup}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-credentials'
+        - Key: ManagedBy
+          Value: wp-ec2-backoffice-plugin
 
   # IAM Role for EC2 instance (allows instance to stop itself)
   EC2InstanceRole:
@@ -95,7 +121,7 @@ Resources:
                 Resource: '*'
                 Condition:
                   StringEquals:
-                    'ec2:ResourceTag/aws:cloudformation:stack-name': !Ref AWS::StackName
+                    'ec2:ResourceTag/CloudFormationStack': !Ref AWS::StackName
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-instance-role'
@@ -114,9 +140,10 @@ Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
+      # Use latest Windows Server 2022 AMI from SSM Parameter
       ImageId: !Sub '{{resolve:ssm:/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base}}'
       InstanceType: !Ref InstanceType
-      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+      KeyName: !Ref EC2KeyPair
       IamInstanceProfile: !Ref EC2InstanceProfile
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
@@ -134,11 +161,8 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           <powershell>
-          # Set Administrator password
-          $Password = ConvertTo-SecureString "${WindowsAdminPassword}" -AsPlainText -Force
-          Get-LocalUser -Name "Administrator" | Set-LocalUser -Password $Password
-          
-          # Enable RDP
+          # Windows Server 2022 comes with RDP enabled by default
+          # Just ensure it's enabled and firewall rules are set
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           
@@ -224,7 +248,7 @@ Resources:
           Value: wp-ec2-backoffice-plugin
         - Key: Purpose
           Value: Email management with Thunderbird
-        - Key: aws:cloudformation:stack-name
+        - Key: CloudFormationStack
           Value: !Ref AWS::StackName
     CreationPolicy:
       ResourceSignal:
@@ -265,16 +289,16 @@ Resources:
               - ec2:StopInstances
               - ec2:DescribeInstances
               - ec2:DescribeInstanceStatus
+              - ec2:GetPasswordData
             Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${EC2Instance}'
           
           # Security group management permissions
           - Sid: SecurityGroupManagement
             Effect: Allow
             Action:
-              - ec2:DescribeSecurityGroups
               - ec2:AuthorizeSecurityGroupIngress
               - ec2:RevokeSecurityGroupIngress
-            Resource: !GetAtt EC2SecurityGroup.GroupId
+            Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${EC2SecurityGroup}'
           
           # Additional describe permissions (no resource restriction)
           - Sid: DescribePermissions
@@ -284,9 +308,14 @@ Resources:
               - ec2:DescribeInstances
               - ec2:DescribeInstanceStatus
             Resource: '*'
-
-Conditions:
-  HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
+          
+          # Secrets Manager read access
+          - Sid: SecretsManagerRead
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+            Resource: !Ref CredentialsSecret
 
 Outputs:
   InstanceId:
@@ -307,21 +336,32 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-SecurityGroupId'
   
-  IAMUserAccessKeyId:
-    Description: Access Key ID for WordPress plugin IAM user
-    Value: !Ref PluginIAMUserAccessKey
+  SecretArn:
+    Description: ARN of the Secrets Manager secret containing all credentials
+    Value: !Ref CredentialsSecret
     Export:
-      Name: !Sub '${AWS::StackName}-AccessKeyId'
+      Name: !Sub '${AWS::StackName}-SecretArn'
   
-  IAMUserSecretAccessKey:
-    Description: Secret Access Key for WordPress plugin IAM user (save this securely)
-    Value: !GetAtt PluginIAMUserAccessKey.SecretAccessKey
+  SecretName:
+    Description: Name of the Secrets Manager secret
+    Value: !Sub '${AWS::StackName}-credentials'
+  
+  KeyPairId:
+    Description: ID of the EC2 KeyPair
+    Value: !GetAtt EC2KeyPair.KeyPairId
     Export:
-      Name: !Sub '${AWS::StackName}-SecretAccessKey'
+      Name: !Sub '${AWS::StackName}-KeyPairId'
   
-  WindowsAdministratorPassword:
-    Description: Windows Administrator password for RDP connection
-    Value: !Ref WindowsAdminPassword
+  WindowsPasswordInstructions:
+    Description: How to get the Windows Administrator password
+    Value: !Sub |
+      Use the private key generated by scripts/generate-keypair.sh or scripts/generate-keypair.ps1
+      Command: aws ec2 get-password-data --instance-id ${EC2Instance} --priv-launch-key ./keypairs/${AWS::StackName}-private-key.pem --region ${AWS::Region} --query PasswordData --output text
+      Or use EC2 Console: EC2 > Instances > ${EC2Instance} > Actions > Security > Get Windows password
+  
+  GetSecretCommand:
+    Description: AWS CLI command to retrieve IAM credentials from Secrets Manager
+    Value: !Sub 'aws secretsmanager get-secret-value --secret-id ${AWS::StackName}-credentials --region ${AWS::Region} --query SecretString --output text | jq .'
   
   RDPConnectionCommand:
     Description: Command to connect via RDP (Windows)
@@ -332,3 +372,9 @@ Outputs:
     Value: !Ref AWS::StackName
     Export:
       Name: !Sub '${AWS::StackName}-StackName'
+  
+  Region:
+    Description: AWS Region (default eu-west-1)
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub '${AWS::StackName}-Region'

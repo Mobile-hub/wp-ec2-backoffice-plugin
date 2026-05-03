@@ -1,6 +1,8 @@
 # Composer
 /vendor/
+/src/vendor/
 composer.lock
+/src/composer.lock
 
 # WordPress
 wp-config.php
@@ -22,7 +24,9 @@ error_log
 
 # Tests
 /tests/coverage/
+/src/tests/coverage/
 .phpunit.result.cache
+/src/.phpunit.result.cache
 
 # Build
 /build/
@@ -31,3 +35,7 @@ error_log
 # Environment
 .env
 .env.local
+
+# Infrastructure keypairs (IMPORTANT: never commit private keys!)
+/infrastructure/keypairs/*.pem
+/infrastructure/keypairs/*.pub

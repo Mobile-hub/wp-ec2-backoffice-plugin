@@ -5,7 +5,10 @@ This directory contains the AWS infrastructure code for deploying the EC2 Window
 ## Contents
 
 - **cloudformation-template.yaml**: CloudFormation template that creates all required AWS resources
-- **scripts/auto-shutdown.ps1**: PowerShell script that automatically stops the instance after 2 hours of RDP inactivity
+- **bin/auto-shutdown.ps1**: PowerShell script that automatically stops the instance after 2 hours of RDP inactivity
+- **bin/generate-keypair.sh**: Bash script to generate RSA keypair before deployment
+- **bin/generate-keypair.ps1**: PowerShell script to generate RSA keypair before deployment
+- **bin/deploy.sh**: Automated deployment script
 
 ## Resources Created
 
@@ -30,31 +33,76 @@ Before deploying, ensure you have:
 
 ## Deployment Instructions
 
-### Step 1: Prepare Parameters
+### Quick Deployment (Automated)
+
+For a fully automated deployment, use the deployment script:
+
+```bash
+cd infrastructure/bin
+./deploy.sh wp-ec2-backoffice vpc-XXXXXXXX subnet-XXXXXXXX eu-west-1 t3.medium
+```
+
+This script will:
+1. Generate the keypair automatically if it doesn't exist
+2. Validate the CloudFormation template
+3. Deploy the stack
+4. Wait for completion
+5. Display all credentials and configuration
+
+### Manual Deployment (Step by Step)
+
+If you prefer manual control, follow these steps:
+
+### Step 1: Generate KeyPair
+
+Before deploying the CloudFormation stack, you need to generate an RSA keypair that will be used to encrypt/decrypt the Windows Administrator password.
+
+**On Linux/macOS:**
+```bash
+cd bin
+./generate-keypair.sh wp-ec2-backoffice
+```
+
+**On Windows (PowerShell):**
+```powershell
+cd bin
+.\generate-keypair.ps1 -StackName "wp-ec2-backoffice"
+```
+
+This will:
+- Generate a private key at `./keypairs/wp-ec2-backoffice-private-key.pem`
+- Generate a public key at `./keypairs/wp-ec2-backoffice-public-key.pub`
+- Display the public key content to use as a CloudFormation parameter
+
+**IMPORTANT:** Keep the private key secure! You'll need it to decrypt the Windows password.
+
+### Step 2: Prepare Parameters
 
 You'll need the following information:
 
 - **VpcId**: The ID of your VPC (e.g., `vpc-12345678`)
 - **SubnetId**: The ID of a public subnet in your VPC (e.g., `subnet-12345678`)
-- **WindowsAdminPassword**: A strong password for the Windows Administrator account (8-41 characters)
+- **KeyPairPublicKey**: The public key content from Step 1
 - **InstanceType**: Instance size (default: `t3.medium`)
-- **KeyPairName**: (Optional) EC2 Key Pair name for troubleshooting
 
-### Step 2: Deploy the Stack
+### Step 3: Deploy the Stack
 
 Using AWS CLI:
 
 ```bash
+# Get the public key content
+PUBLIC_KEY=$(cat ./keypairs/wp-ec2-backoffice-public-key.pub)
+
 aws cloudformation create-stack \
   --stack-name wp-ec2-backoffice \
   --template-body file://cloudformation-template.yaml \
   --parameters \
     ParameterKey=VpcId,ParameterValue=vpc-XXXXXXXX \
     ParameterKey=SubnetId,ParameterValue=subnet-XXXXXXXX \
-    ParameterKey=WindowsAdminPassword,ParameterValue=YourSecurePassword123! \
+    ParameterKey=KeyPairPublicKey,ParameterValue="$PUBLIC_KEY" \
     ParameterKey=InstanceType,ParameterValue=t3.medium \
   --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
+  --region eu-west-1
 ```
 
 Using AWS Console:
@@ -62,30 +110,55 @@ Using AWS Console:
 1. Go to CloudFormation in the AWS Console
 2. Click "Create stack" → "With new resources"
 3. Upload the `cloudformation-template.yaml` file
-4. Fill in the parameters
+4. Fill in the parameters (paste the public key content from Step 1)
 5. Check "I acknowledge that AWS CloudFormation might create IAM resources with custom names"
 6. Click "Create stack"
 
-### Step 3: Wait for Completion
+### Step 4: Wait for Completion
 
 The stack creation takes approximately 10-15 minutes. Monitor progress:
 
 ```bash
 aws cloudformation wait stack-create-complete \
   --stack-name wp-ec2-backoffice \
-  --region us-east-1
+  --region eu-west-1
 ```
 
 Or watch in the AWS Console CloudFormation page.
 
-### Step 4: Retrieve Outputs
+### Step 5: Get Windows Password
+
+After the stack is created and the instance is running, decrypt the Windows Administrator password:
+
+```bash
+# Get the instance ID from stack outputs
+INSTANCE_ID=$(aws cloudformation describe-stacks \
+  --stack-name wp-ec2-backoffice \
+  --region eu-west-1 \
+  --query 'Stacks[0].Outputs[?OutputKey==`InstanceId`].OutputValue' \
+  --output text)
+
+# Get the Windows password
+aws ec2 get-password-data \
+  --instance-id $INSTANCE_ID \
+  --priv-launch-key ./keypairs/wp-ec2-backoffice-private-key.pem \
+  --region eu-west-1 \
+  --query PasswordData \
+  --output text
+```
+
+**Save this password securely!** You'll need it for:
+- RDP connections
+- WordPress plugin configuration
+
+### Step 6: Retrieve Other Outputs
 
 Once complete, get the stack outputs:
 
 ```bash
 aws cloudformation describe-stacks \
   --stack-name wp-ec2-backoffice \
-  --region us-east-1 \
+  --region eu-west-1 \
   --query 'Stacks[0].Outputs'
 ```
 
@@ -93,21 +166,43 @@ You'll need these values for the WordPress plugin configuration:
 
 - **InstanceId**: EC2 instance ID (e.g., `i-1234567890abcdef0`)
 - **SecurityGroupId**: Security group ID (e.g., `sg-1234567890abcdef0`)
-- **IAMUserAccessKeyId**: Access key ID for the plugin
-- **IAMUserSecretAccessKey**: Secret access key for the plugin (save securely!)
-- **WindowsAdministratorPassword**: The password you provided
+- **SecretName**: Secrets Manager secret name (contains IAM credentials)
 - **InstancePublicIP**: Public IP address (when instance is running)
+- **WindowsPassword**: The password you decrypted in Step 5
 
-### Step 5: Configure WordPress Plugin
+### Step 7: Get IAM Credentials from Secrets Manager
+
+The IAM credentials are stored in AWS Secrets Manager for security:
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id wp-ec2-backoffice-credentials \
+  --region eu-west-1 \
+  --query SecretString \
+  --output text | jq .
+```
+
+This will output:
+```json
+{
+  "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+  "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+  "Region": "eu-west-1",
+  "InstanceId": "i-1234567890abcdef0",
+  "SecurityGroupId": "sg-1234567890abcdef0"
+}
+```
+
+### Step 8: Configure WordPress Plugin
 
 1. Log in to your WordPress admin panel
 2. Navigate to "EC2 Backoffice" → "Configuración"
-3. Enter the following values from the stack outputs:
-   - **AWS Region**: The region where you deployed (e.g., `us-east-1`)
-   - **Access Key ID**: Value from `IAMUserAccessKeyId`
-   - **Secret Access Key**: Value from `IAMUserSecretAccessKey`
-   - **Instance ID**: Value from `InstanceId`
-   - **Windows Password**: Value from `WindowsAdministratorPassword`
+3. Enter the following values:
+   - **AWS Region**: `eu-west-1` (or your deployment region)
+   - **Access Key ID**: Value from Secrets Manager `AccessKeyId`
+   - **Secret Access Key**: Value from Secrets Manager `SecretAccessKey`
+   - **Instance ID**: Value from Secrets Manager `InstanceId`
+   - **Windows Password**: The password you decrypted in Step 5
 4. Click "Guardar Configuración"
 5. Click "Probar Conexión" to verify the configuration
 

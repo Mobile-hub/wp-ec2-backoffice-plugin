@@ -1,0 +1,7 @@
+# Ignore all keypair files
+*.pem
+*.pub
+*.key
+
+# But keep this directory in git
+!.gitignore
