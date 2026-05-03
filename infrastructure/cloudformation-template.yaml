@@ -289,7 +289,6 @@ Resources:
               - ec2:StopInstances
               - ec2:DescribeInstances
               - ec2:DescribeInstanceStatus
-              - ec2:GetPasswordData
             Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${EC2Instance}'
           
           # Security group management permissions

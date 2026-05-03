@@ -17,6 +17,25 @@ if (!defined('ABSPATH')) {
  */
 class IP_Detector {
     /**
+     * Whether proxy headers should be trusted when resolving the client IP.
+     *
+     * This defaults to false because these headers are easy to spoof unless the
+     * WordPress installation is explicitly deployed behind a trusted reverse proxy.
+     *
+     * @var bool
+     */
+    private $trust_proxy_headers = false;
+
+    /**
+     * Constructor.
+     *
+     * @param bool $trust_proxy_headers Whether to trust proxy headers.
+     */
+    public function __construct(bool $trust_proxy_headers = false) {
+        $this->trust_proxy_headers = $trust_proxy_headers;
+    }
+
+    /**
      * Get the current user's public IP address
      *
      * Checks multiple HTTP headers to detect the user's IP address,
@@ -29,13 +48,13 @@ class IP_Detector {
         $ip = $this->check_headers();
         
         if (empty($ip)) {
-            throw new \Exception(__('No se pudo determinar la dirección IP actual', 'wp-ec2-backoffice-plugin'));
+            throw new \Exception(__('Could not determine the current IP address.', 'wp-ec2-backoffice-plugin'));
         }
         
         if (!$this->validate_ip($ip)) {
             throw new \Exception(
                 sprintf(
-                    __('La dirección IP detectada no es válida: %s', 'wp-ec2-backoffice-plugin'),
+                    __('The detected IP address is invalid: %s', 'wp-ec2-backoffice-plugin'),
                     $ip
                 )
             );
@@ -70,37 +89,37 @@ class IP_Detector {
     /**
      * Check various HTTP headers for IP address
      *
-     * Checks headers in order of priority:
-     * 1. HTTP_X_FORWARDED_FOR - Set by proxies and load balancers
-     * 2. HTTP_CLIENT_IP - Set by some proxies
-     * 3. REMOTE_ADDR - Direct connection IP
+     * By default, only REMOTE_ADDR is trusted. Proxy headers are only considered
+     * when the detector is explicitly configured to trust them.
      *
      * @return string IP address or empty string if not found
      */
     private function check_headers(): string {
-        // Check X-Forwarded-For header (proxy/load balancer)
-        // This header can contain multiple IPs, we want the first one (client IP)
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip_list = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $ip = trim($ip_list[0]);
-            
-            if ($this->validate_ip($ip)) {
-                return $ip;
+        if ($this->trust_proxy_headers) {
+            // Check X-Forwarded-For header (proxy/load balancer)
+            // This header can contain multiple IPs, we want the first one (client IP)
+            if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                $ip_list = explode(',', wp_unslash($_SERVER['HTTP_X_FORWARDED_FOR']));
+                $ip = trim($ip_list[0]);
+
+                if ($this->validate_ip($ip)) {
+                    return $ip;
+                }
             }
-        }
-        
-        // Check Client-IP header (some proxies)
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            $ip = trim($_SERVER['HTTP_CLIENT_IP']);
-            
-            if ($this->validate_ip($ip)) {
-                return $ip;
+
+            // Check Client-IP header (some proxies)
+            if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+                $ip = trim(wp_unslash($_SERVER['HTTP_CLIENT_IP']));
+
+                if ($this->validate_ip($ip)) {
+                    return $ip;
+                }
             }
         }
         
         // Check REMOTE_ADDR (direct connection)
         if (!empty($_SERVER['REMOTE_ADDR'])) {
-            $ip = trim($_SERVER['REMOTE_ADDR']);
+            $ip = trim(wp_unslash($_SERVER['REMOTE_ADDR']));
             
             if ($this->validate_ip($ip)) {
                 return $ip;
