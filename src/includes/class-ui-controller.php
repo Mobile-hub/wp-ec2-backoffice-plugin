@@ -74,7 +74,10 @@ class UI_Controller {
         }
 
         // Get current tab
-        $current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'access';
+        $current_tab = 'access';
+        if (isset($_GET['tab'])) {
+            $current_tab = sanitize_text_field(wp_unslash($_GET['tab']));
+        }
 
         // Handle configuration save
         if (isset($_POST['save_config']) && check_admin_referer('ec2_save_config', 'ec2_config_nonce')) {
@@ -136,9 +139,9 @@ class UI_Controller {
         $is_running = $instance_state === 'running';
         $is_stopped = $instance_state === 'stopped';
 
-        // Get configuration for password display
+        // Check whether a Windows password is configured without exposing it to the DOM
         $config = $this->config_store->get_config();
-        $windows_password = $config['windows_password'] ?? '';
+        $has_windows_password = !empty($config['windows_password']);
 
         ?>
         <div class="ec2-access-tab">
@@ -196,27 +199,26 @@ class UI_Controller {
                 </p>
             </div>
 
-            <!-- Windows Password Display -->
-            <?php if ($windows_password): ?>
+            <!-- Windows Password Actions -->
+            <?php if ($has_windows_password): ?>
             <div class="ec2-password-section">
-                <h3><?php echo esc_html__('Contraseña de Windows', 'wp-ec2-backoffice-plugin'); ?></h3>
+                <h3><?php echo esc_html__('Windows Password', 'wp-ec2-backoffice-plugin'); ?></h3>
                 <p>
-                    <strong><?php echo esc_html__('Usuario:', 'wp-ec2-backoffice-plugin'); ?></strong> Administrator
+                    <strong><?php echo esc_html__('Username:', 'wp-ec2-backoffice-plugin'); ?></strong> Administrator
                 </p>
                 <p>
-                    <strong><?php echo esc_html__('Contraseña:', 'wp-ec2-backoffice-plugin'); ?></strong>
+                    <strong><?php echo esc_html__('Password:', 'wp-ec2-backoffice-plugin'); ?></strong>
                     <span id="ec2-password-display" class="ec2-password-masked">••••••••••••</span>
                     <button type="button" id="ec2-toggle-password-btn" class="button button-small">
-                        <?php echo esc_html__('Mostrar', 'wp-ec2-backoffice-plugin'); ?>
+                        <?php echo esc_html__('Reveal', 'wp-ec2-backoffice-plugin'); ?>
                     </button>
                     <button type="button" id="ec2-copy-password-btn" class="button button-small">
-                        <?php echo esc_html__('Copiar', 'wp-ec2-backoffice-plugin'); ?>
+                        <?php echo esc_html__('Copy', 'wp-ec2-backoffice-plugin'); ?>
                     </button>
                     <span id="ec2-copy-feedback" style="display:none; color:green; margin-left:10px;">
-                        <?php echo esc_html__('¡Copiado!', 'wp-ec2-backoffice-plugin'); ?>
+                        <?php echo esc_html__('Copied!', 'wp-ec2-backoffice-plugin'); ?>
                     </span>
                 </p>
-                <input type="hidden" id="ec2-password-value" value="<?php echo esc_attr($windows_password); ?>">
             </div>
             <?php endif; ?>
 
@@ -303,14 +305,15 @@ class UI_Controller {
                     
                     <tr>
                         <th scope="row">
-                            <label for="windows_password"><?php echo esc_html__('Contraseña de Windows', 'wp-ec2-backoffice-plugin'); ?></label>
+                            <label for="windows_password"><?php echo esc_html__('Windows Password', 'wp-ec2-backoffice-plugin'); ?></label>
                         </th>
                         <td>
                             <input type="password" id="windows_password" name="windows_password" 
-                                   value="<?php echo esc_attr($config['windows_password'] ?? ''); ?>" 
-                                   class="regular-text">
+                                   value="" 
+                                   class="regular-text"
+                                   placeholder="<?php echo esc_attr__('Enter a new password or leave blank to keep the current one', 'wp-ec2-backoffice-plugin'); ?>">
                             <p class="description">
-                                <?php echo esc_html__('Contraseña del usuario Administrator de Windows.', 'wp-ec2-backoffice-plugin'); ?>
+                                <?php echo esc_html__('Password for the Windows Administrator account.', 'wp-ec2-backoffice-plugin'); ?>
                             </p>
                         </td>
                     </tr>
@@ -472,6 +475,28 @@ class UI_Controller {
     }
 
     /**
+     * Handle AJAX request to retrieve the Windows password on demand.
+     */
+    public function handle_ajax_get_windows_password() {
+        if (!$this->verify_nonce_and_capability()) {
+            wp_send_json_error(array('message' => __('Security verification failed.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        $config = $this->config_store->get_config();
+        $windows_password = $config['windows_password'] ?? '';
+
+        if (empty($windows_password)) {
+            wp_send_json_error(array('message' => __('No Windows password is configured.', 'wp-ec2-backoffice-plugin')));
+            return;
+        }
+
+        wp_send_json_success(array(
+            'password' => $windows_password,
+        ));
+    }
+
+    /**
      * Handle AJAX request to download RDP file
      */
     public function handle_ajax_download_rdp() {
@@ -535,7 +560,12 @@ class UI_Controller {
      */
     private function verify_nonce_and_capability() {
         // Check nonce
-        if (!isset($_REQUEST['nonce']) || !wp_verify_nonce($_REQUEST['nonce'], 'ec2_ajax_nonce')) {
+        if (!isset($_REQUEST['nonce'])) {
+            return false;
+        }
+
+        $nonce = sanitize_text_field(wp_unslash($_REQUEST['nonce']));
+        if (!wp_verify_nonce($nonce, 'ec2_ajax_nonce')) {
             return false;
         }
 
@@ -555,17 +585,17 @@ class UI_Controller {
     private function handle_save_configuration() {
         // Get POST data
         $config_data = array(
-            'aws_region' => isset($_POST['aws_region']) ? sanitize_text_field($_POST['aws_region']) : '',
-            'aws_access_key_id' => isset($_POST['aws_access_key_id']) ? sanitize_text_field($_POST['aws_access_key_id']) : '',
-            'ec2_instance_id' => isset($_POST['ec2_instance_id']) ? sanitize_text_field($_POST['ec2_instance_id']) : '',
+            'aws_region' => isset($_POST['aws_region']) ? sanitize_text_field(wp_unslash($_POST['aws_region'])) : '',
+            'aws_access_key_id' => isset($_POST['aws_access_key_id']) ? sanitize_text_field(wp_unslash($_POST['aws_access_key_id'])) : '',
+            'ec2_instance_id' => isset($_POST['ec2_instance_id']) ? sanitize_text_field(wp_unslash($_POST['ec2_instance_id'])) : '',
         );
 
         // Handle secret access key - only update if not masked
         if (isset($_POST['aws_secret_access_key']) && !empty($_POST['aws_secret_access_key'])) {
-            $secret_key = $_POST['aws_secret_access_key'];
+            $secret_key = sanitize_text_field(wp_unslash($_POST['aws_secret_access_key']));
             // Check if it's not the masked value
             if (strpos($secret_key, '•') === false) {
-                $config_data['aws_secret_access_key'] = sanitize_text_field($secret_key);
+                $config_data['aws_secret_access_key'] = $secret_key;
             } else {
                 // Keep existing secret key
                 $existing_config = $this->config_store->get_config();
@@ -583,7 +613,7 @@ class UI_Controller {
 
         // Handle Windows password
         if (isset($_POST['windows_password']) && !empty($_POST['windows_password'])) {
-            $config_data['windows_password'] = sanitize_text_field($_POST['windows_password']);
+            $config_data['windows_password'] = sanitize_text_field(wp_unslash($_POST['windows_password']));
         } else {
             // Keep existing password if field is empty
             $existing_config = $this->config_store->get_config();

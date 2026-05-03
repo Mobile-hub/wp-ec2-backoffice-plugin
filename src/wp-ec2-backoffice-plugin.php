@@ -78,7 +78,7 @@ function wp_ec2_backoffice_activate() {
         );
     }
 }
-register_activation_hook(__FILE__, 'wp_ec2_backoffice_activate');
+register_activation_hook(WP_EC2_BACKOFFICE_BOOTSTRAP_FILE, 'wp_ec2_backoffice_activate');
 
 /**
  * Deactivation hook
@@ -86,4 +86,4 @@ register_activation_hook(__FILE__, 'wp_ec2_backoffice_activate');
 function wp_ec2_backoffice_deactivate() {
     // Clean up if needed
 }
-register_deactivation_hook(__FILE__, 'wp_ec2_backoffice_deactivate');
+register_deactivation_hook(WP_EC2_BACKOFFICE_BOOTSTRAP_FILE, 'wp_ec2_backoffice_deactivate');

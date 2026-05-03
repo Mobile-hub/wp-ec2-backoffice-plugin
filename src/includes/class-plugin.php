@@ -196,6 +196,7 @@ class Plugin {
         add_action('wp_ajax_ec2_stop_instance', array($this->ui_controller, 'handle_ajax_stop_instance'));
         add_action('wp_ajax_ec2_get_status', array($this->ui_controller, 'handle_ajax_get_status'));
         add_action('wp_ajax_ec2_test_connection', array($this->ui_controller, 'handle_ajax_test_connection'));
+        add_action('wp_ajax_ec2_get_windows_password', array($this->ui_controller, 'handle_ajax_get_windows_password'));
         add_action('wp_ajax_ec2_download_rdp', array($this->ui_controller, 'handle_ajax_download_rdp'));
     }
 

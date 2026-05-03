@@ -15,6 +15,7 @@
         pollingDelay: 60000, // 60 seconds
         isOperationInProgress: false,
         currentInstanceState: null,
+        windowsPassword: null,
 
         /**
          * Initialize the plugin
@@ -300,16 +301,18 @@
             
             const $display = $('#ec2-password-display');
             const $button = $('#ec2-toggle-password-btn');
-            const password = $('#ec2-password-value').val();
-            
+
             if ($display.hasClass('ec2-password-masked')) {
-                // Show password
-                $display.removeClass('ec2-password-masked').text(password);
-                $button.text('Ocultar');
+                this.fetchWindowsPassword().done(function(password) {
+                    $display.removeClass('ec2-password-masked').text(password);
+                    $button.text('Hide');
+                }).fail(function(message) {
+                    alert(message);
+                });
             } else {
-                // Hide password
                 $display.addClass('ec2-password-masked').text('••••••••••••');
-                $button.text('Mostrar');
+                $button.text('Reveal');
+                this.windowsPassword = null;
             }
         },
 
@@ -319,43 +322,78 @@
         handleCopyPassword: function(e) {
             e.preventDefault();
             
-            const password = $('#ec2-password-value').val();
             const $feedback = $('#ec2-copy-feedback');
-            
-            // Use Clipboard API
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(password).then(
-                    function() {
-                        // Show confirmation message
+
+            this.fetchWindowsPassword().done(function(password) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(password).then(
+                        function() {
+                            $feedback.fadeIn();
+                            setTimeout(function() {
+                                $feedback.fadeOut();
+                            }, 2000);
+                        },
+                        function(err) {
+                            console.error('Failed to copy password:', err);
+                            alert('Failed to copy the password');
+                        }
+                    );
+                } else {
+                    const $temp = $('<textarea>');
+                    $('body').append($temp);
+                    $temp.val(password).select();
+
+                    try {
+                        document.execCommand('copy');
                         $feedback.fadeIn();
                         setTimeout(function() {
                             $feedback.fadeOut();
                         }, 2000);
-                    },
-                    function(err) {
+                    } catch (err) {
                         console.error('Failed to copy password:', err);
-                        alert('Error al copiar la contraseña');
+                        alert('Failed to copy the password');
                     }
-                );
-            } else {
-                // Fallback for older browsers
-                const $temp = $('<textarea>');
-                $('body').append($temp);
-                $temp.val(password).select();
-                
-                try {
-                    document.execCommand('copy');
-                    $feedback.fadeIn();
-                    setTimeout(function() {
-                        $feedback.fadeOut();
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to copy password:', err);
-                    alert('Error al copiar la contraseña');
+
+                    $temp.remove();
                 }
-                
-                $temp.remove();
+            }).fail(function(message) {
+                alert(message);
+            });
+        },
+
+        /**
+         * Fetch the Windows password on demand.
+         */
+        fetchWindowsPassword: function() {
+            const deferred = $.Deferred();
+
+            if (this.windowsPassword) {
+                deferred.resolve(this.windowsPassword);
+                return deferred.promise();
             }
+
+            $.ajax({
+                url: wpEc2Backoffice.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'ec2_get_windows_password',
+                    nonce: $('#ec2-ajax-nonce').val()
+                },
+                success: function(response) {
+                    if (response.success && response.data && response.data.password) {
+                        this.windowsPassword = response.data.password;
+                        deferred.resolve(response.data.password);
+                        return;
+                    }
+
+                    deferred.reject((response.data && response.data.message) ? response.data.message : 'Unable to load the Windows password');
+                }.bind(this),
+                error: function(xhr, status, error) {
+                    deferred.reject('Unable to load the Windows password: ' + error);
+                }
+            });
+
+            return deferred.promise();
         },
 
         /**
