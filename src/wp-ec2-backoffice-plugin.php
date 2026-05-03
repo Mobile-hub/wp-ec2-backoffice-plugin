@@ -1,11 +1,9 @@
 <?php
 /**
  * Plugin Name: WP EC2 Backoffice Plugin
- * Plugin URI: https://github.com/your-username/wp-ec2-backoffice-plugin
  * Description: Gestiona una instancia EC2 de Windows desde el área de administración de WordPress. Permite iniciar/detener la instancia, gestionar reglas de seguridad automáticamente y descargar archivos de conexión RDP.
  * Version: 1.0.0
- * Author: Your Name
- * Author URI: https://yourwebsite.com
+ * Author: WP EC2 Backoffice Plugin Contributors
  * License: MIT
  * License URI: https://opensource.org/licenses/MIT
  * Text Domain: wp-ec2-backoffice-plugin

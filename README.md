@@ -36,7 +36,7 @@ El template de CloudFormation creará:
 
 ```bash
 cd /path/to/wordpress/wp-content/plugins/
-git clone https://github.com/your-username/wp-ec2-backoffice-plugin.git
+git clone https://github.com/Mobile-hub/wp-ec2-backoffice-plugin.git
 ```
 
 ### Paso 3: Instalar Dependencias
@@ -266,10 +266,6 @@ Las contribuciones son bienvenidas. Por favor, abre un issue o pull request en G
 ## Soporte
 
 Para reportar bugs o solicitar funcionalidades, por favor abre un issue en GitHub.
-
-## Autor
-
-Your Name - [your.email@example.com](mailto:your.email@example.com)
 
 ## Agradecimientos
 

@@ -1,12 +1,11 @@
 {
-    "name": "your-username/wp-ec2-backoffice-plugin",
+    "name": "wp-ec2-backoffice-plugin/wp-ec2-backoffice-plugin",
     "description": "WordPress plugin para gestionar instancias EC2 de Windows desde el área de administración",
     "type": "wordpress-plugin",
     "license": "MIT",
     "authors": [
         {
-            "name": "Your Name",
-            "email": "your.email@example.com"
+            "name": "WP EC2 Backoffice Plugin Contributors"
         }
     ],
     "require": {
