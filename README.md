@@ -1,65 +1,80 @@
 # WP EC2 Backoffice Plugin
 
-Plugin de WordPress para gestionar una instancia EC2 de Windows desde el área de administración.
+A WordPress plugin for managing a Windows EC2 instance from the WordPress admin area.
 
-## Descripción
+## Overview
 
-Este plugin proporciona una interfaz simplificada para gestionar una instancia EC2 de Windows utilizada como escritorio remoto para la gestión de correo electrónico con Thunderbird. El plugin permite:
+This plugin provides a simplified admin interface for managing a Windows EC2 instance used as a remote desktop. It supports:
 
-- Iniciar y detener la instancia EC2
-- Gestionar automáticamente las reglas de seguridad para acceso RDP
-- Descargar archivos de conexión RDP
-- Ver el estado de la instancia en tiempo real
-- Configurar credenciales de AWS de forma segura
+- Starting and stopping the EC2 instance
+- Automatically managing RDP access rules
+- Downloading RDP connection files
+- Checking instance status from WordPress
+- Storing AWS credentials in WordPress settings
 
-## Requisitos Previos
+## Repository Layout
 
-- WordPress 5.0 o superior
-- PHP 7.4 o superior con extensión OpenSSL
-- Composer para gestión de dependencias
-- Cuenta de AWS con permisos apropiados
-- Infraestructura AWS desplegada (ver sección de Infraestructura)
+This repository uses a hybrid layout:
 
-## Instalación
+- `wp-ec2-backoffice-plugin.php` at the repository root is the WordPress bootstrap file.
+- `src/` contains the actual plugin source code, Composer files, assets, and tests.
+- `infrastructure/` contains the AWS deployment assets.
 
-### Paso 1: Desplegar la Infraestructura AWS
+## Prerequisites
 
-Antes de instalar el plugin, debes desplegar la infraestructura AWS necesaria. Consulta la [documentación de infraestructura](infrastructure/README.md) para instrucciones detalladas.
+- WordPress 5.0 or later
+- PHP 7.4 or later with OpenSSL enabled
+- Composer
+- An AWS account with appropriate permissions
+- The AWS infrastructure deployed first (see `infrastructure/`)
 
-El template de CloudFormation creará:
-- Una instancia EC2 Windows Server 2022
-- Un usuario IAM con permisos limitados
-- Un grupo de seguridad para acceso RDP
-- Un script de auto-apagado para reducir costos
+## Installation
 
-### Paso 2: Clonar el Repositorio
+### Option A: Build the plugin ZIP locally
+
+```bash
+git clone https://github.com/Mobile-hub/wp-ec2-backoffice-plugin.git
+cd wp-ec2-backoffice-plugin
+make install
+```
+
+This creates `dist/wp-ec2-backoffice-plugin.zip`, which can be uploaded from the WordPress admin panel.
+
+### Option B: Use the repository directly during development
+
+Clone the repository into `wp-content/plugins/`, then install dependencies inside `src/`:
 
 ```bash
 cd /path/to/wordpress/wp-content/plugins/
 git clone https://github.com/Mobile-hub/wp-ec2-backoffice-plugin.git
-```
-
-### Paso 3: Instalar Dependencias
-
-El plugin requiere el AWS SDK para PHP. Instálalo usando Composer:
-
-```bash
 cd wp-ec2-backoffice-plugin
-composer install --no-dev
+composer install --working-dir=src --no-dev
 ```
 
-### Paso 4: Activar el Plugin
+### Deploy the AWS infrastructure first
 
-Desde la línea de comandos:
+Before using the plugin, deploy the required AWS infrastructure. See [infrastructure/README.md](infrastructure/README.md).
+
+The CloudFormation template creates:
+
+- A Windows Server 2022 EC2 instance
+- An IAM user with limited permissions
+- A security group for RDP access
+- An auto-shutdown script to reduce costs
+
+### Activate the plugin
+
+From the command line:
 
 ```bash
 wp plugin activate wp-ec2-backoffice-plugin
 ```
 
-O desde el panel de administración de WordPress:
-1. Ve a **Plugins** → **Plugins Instalados**
-2. Busca "WP EC2 Backoffice Plugin"
-3. Haz clic en **Activar**
+Or from the WordPress admin panel:
+
+1. Go to **Plugins** → **Installed Plugins**
+2. Find **WP EC2 Backoffice Plugin**
+3. Click **Activate**
 
 ## Configuración
 

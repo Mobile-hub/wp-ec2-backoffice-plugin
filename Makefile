@@ -1,11 +1,11 @@
-# Makefile para WordPress EC2 Backoffice Plugin
-# Gestiona la verificación de dependencias, instalación y empaquetado del plugin
+# Makefile for WP EC2 Backoffice Plugin
+# Handles dependency checks, installation, testing, and packaging
 
 .PHONY: help check setup build clean install test deploy deploy-validate deploy-status deploy-outputs deploy-delete deploy-keypair
 
 # Variables
 PLUGIN_NAME = wp-ec2-backoffice-plugin
-PLUGIN_VERSION = $(shell grep "Version:" src/wp-ec2-backoffice-plugin.php | awk '{print $$3}')
+PLUGIN_VERSION = $(shell grep "Version:" wp-ec2-backoffice-plugin.php | awk '{print $$3}')
 BUILD_DIR = build
 DIST_DIR = dist
 ZIP_FILE = $(DIST_DIR)/$(PLUGIN_NAME).zip
@@ -30,27 +30,27 @@ GREEN = \033[0;32m
 YELLOW = \033[1;33m
 NC = \033[0m # No Color
 
-# Target por defecto
+# Default target
 help:
 	@echo "$(GREEN)WordPress EC2 Backoffice Plugin - Makefile$(NC)"
 	@echo ""
-	@echo "Targets disponibles:"
+	@echo "Available targets:"
 	@echo ""
 	@echo "$(GREEN)Plugin:$(NC)"
-	@echo "  $(YELLOW)make check$(NC)            - Verifica que todas las dependencias estén instaladas"
-	@echo "  $(YELLOW)make setup$(NC)            - Instala las dependencias de Composer"
-	@echo "  $(YELLOW)make build$(NC)            - Genera el archivo ZIP para instalación en WordPress"
-	@echo "  $(YELLOW)make clean$(NC)            - Limpia archivos temporales y builds anteriores"
-	@echo "  $(YELLOW)make install$(NC)          - Ejecuta check + setup + build (flujo completo)"
-	@echo "  $(YELLOW)make test$(NC)             - Ejecuta los tests del plugin"
+	@echo "  $(YELLOW)make check$(NC)            - Verify required local dependencies"
+	@echo "  $(YELLOW)make setup$(NC)            - Install Composer dependencies in src/"
+	@echo "  $(YELLOW)make build$(NC)            - Build the ZIP package for WordPress"
+	@echo "  $(YELLOW)make clean$(NC)            - Remove build artifacts and installed dependencies"
+	@echo "  $(YELLOW)make install$(NC)          - Run check + setup + build"
+	@echo "  $(YELLOW)make test$(NC)             - Run plugin tests"
 	@echo ""
 	@echo "$(GREEN)AWS Infrastructure:$(NC)"
-	@echo "  $(YELLOW)make deploy-keypair$(NC)   - Genera el keypair RSA para la instancia EC2"
-	@echo "  $(YELLOW)make deploy$(NC)           - Despliega la infraestructura en AWS con CloudFormation"
-	@echo "  $(YELLOW)make deploy-validate$(NC)  - Valida el template de CloudFormation"
-	@echo "  $(YELLOW)make deploy-status$(NC)    - Muestra el estado del stack de CloudFormation"
-	@echo "  $(YELLOW)make deploy-outputs$(NC)   - Muestra los outputs del stack (credenciales, IPs, etc.)"
-	@echo "  $(YELLOW)make deploy-delete$(NC)    - Elimina el stack de CloudFormation"
+	@echo "  $(YELLOW)make deploy-keypair$(NC)   - Generate the RSA key pair for EC2"
+	@echo "  $(YELLOW)make deploy$(NC)           - Deploy AWS infrastructure with CloudFormation"
+	@echo "  $(YELLOW)make deploy-validate$(NC)  - Validate the CloudFormation template"
+	@echo "  $(YELLOW)make deploy-status$(NC)    - Show CloudFormation stack status"
+	@echo "  $(YELLOW)make deploy-outputs$(NC)   - Show stack outputs (credentials, IPs, etc.)"
+	@echo "  $(YELLOW)make deploy-delete$(NC)    - Delete the CloudFormation stack"
 	@echo ""
 
 # Verifica que todas las herramientas necesarias estén instaladas
@@ -73,7 +73,7 @@ check:
 	@echo ""
 	@echo "$(GREEN)✓ Todas las dependencias están instaladas correctamente$(NC)"
 
-# Instala las dependencias de Composer
+# Install Composer dependencies
 setup: check
 	@echo "$(YELLOW)Instalando dependencias de Composer...$(NC)"
 	@echo ""
@@ -85,11 +85,11 @@ setup: check
 	@echo ""
 	@echo "$(GREEN)✓ Dependencias instaladas correctamente$(NC)"
 
-# Genera el archivo ZIP para instalación
+# Build the installable plugin ZIP
 build: check
 	@echo "$(YELLOW)Generando archivo ZIP del plugin...$(NC)"
 	@echo ""
-	@# Verificar que vendor existe
+	@# Verify that vendor exists in src/
 	@if [ ! -d "$(SRC_DIR)/vendor" ]; then \
 		echo "$(RED)✗ Directorio $(SRC_DIR)/vendor no encontrado. Ejecuta 'make setup' primero$(NC)"; \
 		exit 1; \
@@ -102,15 +102,19 @@ build: check
 	@# Crear directorio temporal del plugin
 	@mkdir -p $(BUILD_DIR)/$(PLUGIN_NAME)
 	@echo "$(GREEN)✓ Directorios de build creados$(NC)"
-	@# Copiar archivos del plugin desde src/
-	@echo "$(YELLOW)Copiando archivos del plugin desde $(SRC_DIR)/...$(NC)"
-	@cp -r $(SRC_DIR)/admin $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@cp -r $(SRC_DIR)/includes $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@cp -r $(SRC_DIR)/languages $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@cp -r $(SRC_DIR)/vendor $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@cp $(SRC_DIR)/wp-ec2-backoffice-plugin.php $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@cp $(SRC_DIR)/composer.json $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@if [ -f "$(SRC_DIR)/composer.lock" ]; then cp $(SRC_DIR)/composer.lock $(BUILD_DIR)/$(PLUGIN_NAME)/; fi
+	@# Copy the root bootstrap plus the source tree
+	@echo "$(YELLOW)Copying plugin files...$(NC)"
+	@cp wp-ec2-backoffice-plugin.php $(BUILD_DIR)/$(PLUGIN_NAME)/
+	@mkdir -p $(BUILD_DIR)/$(PLUGIN_NAME)/src
+	@cp -r $(SRC_DIR)/admin $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp -r $(SRC_DIR)/includes $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp -r $(SRC_DIR)/languages $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp -r $(SRC_DIR)/tests $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp -r $(SRC_DIR)/vendor $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp $(SRC_DIR)/wp-ec2-backoffice-plugin.php $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp $(SRC_DIR)/composer.json $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@cp $(SRC_DIR)/phpunit.xml $(BUILD_DIR)/$(PLUGIN_NAME)/src/
+	@if [ -f "$(SRC_DIR)/composer.lock" ]; then cp $(SRC_DIR)/composer.lock $(BUILD_DIR)/$(PLUGIN_NAME)/src/; fi
 	@cp LICENSE $(BUILD_DIR)/$(PLUGIN_NAME)/
 	@cp README.md $(BUILD_DIR)/$(PLUGIN_NAME)/
 	@echo "$(GREEN)✓ Archivos copiados$(NC)"
@@ -132,7 +136,7 @@ build: check
 	@echo "  2. Selecciona el archivo: $(ZIP_FILE)"
 	@echo "  3. Haz clic en 'Instalar ahora'"
 
-# Limpia archivos temporales y builds
+# Clean build artifacts and local dependencies
 clean:
 	@echo "$(YELLOW)Limpiando archivos temporales...$(NC)"
 	@rm -rf $(BUILD_DIR)
@@ -150,7 +154,7 @@ install: check setup build
 	@echo "El plugin está listo para instalar en WordPress."
 	@echo "Archivo generado: $(ZIP_FILE)"
 
-# Ejecuta los tests del plugin
+# Run tests
 test: check
 	@echo "$(YELLOW)Ejecutando tests...$(NC)"
 	@echo ""
