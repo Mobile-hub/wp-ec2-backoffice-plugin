@@ -37,7 +37,7 @@ function wp_ec2_backoffice_missing_dependencies_notice() {
     <div class="notice notice-error">
         <p>
             <?php 
-            echo esc_html__('WP EC2 Backoffice Plugin: Las dependencias no están instaladas. Por favor ejecuta "composer install" en el directorio del plugin.', 'wp-ec2-backoffice-plugin'); 
+            echo esc_html__('WP EC2 Backoffice Plugin: dependencies are not installed. Please run "composer install --working-dir=src" in the plugin directory.', 'wp-ec2-backoffice-plugin'); 
             ?>
         </p>
     </div>
@@ -52,8 +52,8 @@ function wp_ec2_backoffice_activate() {
     if (version_compare(PHP_VERSION, '7.4', '<')) {
         deactivate_plugins(WP_EC2_BACKOFFICE_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('Este plugin requiere PHP 7.4 o superior.', 'wp-ec2-backoffice-plugin'),
-            esc_html__('Error de Activación del Plugin', 'wp-ec2-backoffice-plugin'),
+            esc_html__('This plugin requires PHP 7.4 or later.', 'wp-ec2-backoffice-plugin'),
+            esc_html__('Plugin Activation Error', 'wp-ec2-backoffice-plugin'),
             array('back_link' => true)
         );
     }
@@ -62,8 +62,8 @@ function wp_ec2_backoffice_activate() {
     if (version_compare(get_bloginfo('version'), '5.0', '<')) {
         deactivate_plugins(WP_EC2_BACKOFFICE_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('Este plugin requiere WordPress 5.0 o superior.', 'wp-ec2-backoffice-plugin'),
-            esc_html__('Error de Activación del Plugin', 'wp-ec2-backoffice-plugin'),
+            esc_html__('This plugin requires WordPress 5.0 or later.', 'wp-ec2-backoffice-plugin'),
+            esc_html__('Plugin Activation Error', 'wp-ec2-backoffice-plugin'),
             array('back_link' => true)
         );
     }
@@ -72,8 +72,8 @@ function wp_ec2_backoffice_activate() {
     if (!extension_loaded('openssl')) {
         deactivate_plugins(WP_EC2_BACKOFFICE_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('Este plugin requiere la extensión OpenSSL de PHP.', 'wp-ec2-backoffice-plugin'),
-            esc_html__('Error de Activación del Plugin', 'wp-ec2-backoffice-plugin'),
+            esc_html__('This plugin requires the OpenSSL PHP extension.', 'wp-ec2-backoffice-plugin'),
+            esc_html__('Plugin Activation Error', 'wp-ec2-backoffice-plugin'),
             array('back_link' => true)
         );
     }

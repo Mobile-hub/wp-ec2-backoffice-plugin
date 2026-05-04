@@ -24,7 +24,7 @@ INSTANCE_TYPE ?= t3.medium
 VPC_ID ?=
 SUBNET_ID ?=
 
-# Colores para output
+# ANSI colors for terminal output
 RED = \033[0;31m
 GREEN = \033[0;32m
 YELLOW = \033[1;33m
@@ -53,55 +53,55 @@ help:
 	@echo "  $(YELLOW)make deploy-delete$(NC)    - Delete the CloudFormation stack"
 	@echo ""
 
-# Verifica que todas las herramientas necesarias estén instaladas
+# Verify that the required tools are available locally
 check:
-	@echo "$(YELLOW)Verificando dependencias...$(NC)"
+	@echo "$(YELLOW)Checking dependencies...$(NC)"
 	@echo ""
-	@command -v php >/dev/null 2>&1 || { echo "$(RED)✗ PHP no está instalado$(NC)"; exit 1; }
-	@echo "$(GREEN)✓ PHP encontrado:$(NC) $$(php -v | head -n 1)"
-	@php -r "exit(version_compare(PHP_VERSION, '7.4.0', '>=') ? 0 : 1);" || { echo "$(RED)✗ Se requiere PHP 7.4 o superior$(NC)"; exit 1; }
-	@echo "$(GREEN)✓ Versión de PHP válida$(NC)"
+	@command -v php >/dev/null 2>&1 || { echo "$(RED)✗ PHP is not installed$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ PHP found:$(NC) $$(php -v | head -n 1)"
+	@php -r "exit(version_compare(PHP_VERSION, '7.4.0', '>=') ? 0 : 1);" || { echo "$(RED)✗ PHP 7.4 or later is required$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ PHP version is valid$(NC)"
 	@echo ""
-	@command -v composer >/dev/null 2>&1 || { echo "$(RED)✗ Composer no está instalado$(NC)"; exit 1; }
-	@echo "$(GREEN)✓ Composer encontrado:$(NC) $$(composer --version 2>/dev/null | head -n 1)"
+	@command -v composer >/dev/null 2>&1 || { echo "$(RED)✗ Composer is not installed$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ Composer found:$(NC) $$(composer --version 2>/dev/null | head -n 1)"
 	@echo ""
-	@command -v zip >/dev/null 2>&1 || { echo "$(RED)✗ zip no está instalado$(NC)"; exit 1; }
-	@echo "$(GREEN)✓ zip encontrado:$(NC) $$(zip -v 2>/dev/null | head -n 2 | tail -n 1)"
+	@command -v zip >/dev/null 2>&1 || { echo "$(RED)✗ zip is not installed$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ zip found:$(NC) $$(zip -v 2>/dev/null | head -n 2 | tail -n 1)"
 	@echo ""
-	@php -m | grep -q openssl || { echo "$(RED)✗ Extensión OpenSSL de PHP no está disponible$(NC)"; exit 1; }
-	@echo "$(GREEN)✓ Extensión OpenSSL de PHP disponible$(NC)"
+	@php -m | grep -q openssl || { echo "$(RED)✗ The PHP OpenSSL extension is not available$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ PHP OpenSSL extension is available$(NC)"
 	@echo ""
-	@echo "$(GREEN)✓ Todas las dependencias están instaladas correctamente$(NC)"
+	@echo "$(GREEN)✓ All dependencies are installed correctly$(NC)"
 
 # Install Composer dependencies
 setup: check
-	@echo "$(YELLOW)Instalando dependencias de Composer...$(NC)"
+	@echo "$(YELLOW)Installing Composer dependencies...$(NC)"
 	@echo ""
 	@if [ ! -f "$(SRC_DIR)/composer.json" ]; then \
-		echo "$(RED)✗ No se encontró $(SRC_DIR)/composer.json$(NC)"; \
+		echo "$(RED)✗ $(SRC_DIR)/composer.json was not found$(NC)"; \
 		exit 1; \
 	fi
 	composer install --no-dev --optimize-autoloader --working-dir=$(SRC_DIR)
 	@echo ""
-	@echo "$(GREEN)✓ Dependencias instaladas correctamente$(NC)"
+	@echo "$(GREEN)✓ Dependencies installed successfully$(NC)"
 
 # Build the installable plugin ZIP
 build: check
-	@echo "$(YELLOW)Generando archivo ZIP del plugin...$(NC)"
+	@echo "$(YELLOW)Building plugin ZIP archive...$(NC)"
 	@echo ""
 	@# Verify that vendor exists in src/
 	@if [ ! -d "$(SRC_DIR)/vendor" ]; then \
-		echo "$(RED)✗ Directorio $(SRC_DIR)/vendor no encontrado. Ejecuta 'make setup' primero$(NC)"; \
+		echo "$(RED)✗ $(SRC_DIR)/vendor was not found. Run 'make setup' first$(NC)"; \
 		exit 1; \
 	fi
-	@# Crear directorios de build
+	@# Create build directories
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(DIST_DIR)
-	@# Limpiar build anterior
+	@# Remove previous build output
 	@rm -rf $(BUILD_DIR)/$(PLUGIN_NAME)
-	@# Crear directorio temporal del plugin
+	@# Create temporary plugin directory
 	@mkdir -p $(BUILD_DIR)/$(PLUGIN_NAME)
-	@echo "$(GREEN)✓ Directorios de build creados$(NC)"
+	@echo "$(GREEN)✓ Build directories created$(NC)"
 	@# Copy the root bootstrap plus the source tree
 	@echo "$(YELLOW)Copying plugin files...$(NC)"
 	@cp wp-ec2-backoffice-plugin.php $(BUILD_DIR)/$(PLUGIN_NAME)/
@@ -117,58 +117,58 @@ build: check
 	@if [ -f "$(SRC_DIR)/composer.lock" ]; then cp $(SRC_DIR)/composer.lock $(BUILD_DIR)/$(PLUGIN_NAME)/src/; fi
 	@cp LICENSE $(BUILD_DIR)/$(PLUGIN_NAME)/
 	@cp README.md $(BUILD_DIR)/$(PLUGIN_NAME)/
-	@echo "$(GREEN)✓ Archivos copiados$(NC)"
-	@# Crear ZIP
-	@echo "$(YELLOW)Creando archivo ZIP...$(NC)"
+	@echo "$(GREEN)✓ Files copied$(NC)"
+	@# Create ZIP
+	@echo "$(YELLOW)Creating ZIP archive...$(NC)"
 	@cd $(BUILD_DIR) && zip -r ../$(ZIP_FILE) $(PLUGIN_NAME) -q
-	@echo "$(GREEN)✓ Archivo ZIP creado: $(ZIP_FILE)$(NC)"
-	@# Mostrar información del archivo
+	@echo "$(GREEN)✓ ZIP archive created: $(ZIP_FILE)$(NC)"
+	@# Show build information
 	@echo ""
-	@echo "$(GREEN)Información del build:$(NC)"
-	@echo "  Archivo: $(ZIP_FILE)"
-	@echo "  Tamaño: $$(du -h $(ZIP_FILE) | cut -f1)"
-	@echo "  Versión: $(PLUGIN_VERSION)"
+	@echo "$(GREEN)Build information:$(NC)"
+	@echo "  Archive: $(ZIP_FILE)"
+	@echo "  Size: $$(du -h $(ZIP_FILE) | cut -f1)"
+	@echo "  Version: $(PLUGIN_VERSION)"
 	@echo ""
-	@echo "$(GREEN)✓ Build completado exitosamente$(NC)"
+	@echo "$(GREEN)✓ Build completed successfully$(NC)"
 	@echo ""
-	@echo "Para instalar el plugin en WordPress:"
-	@echo "  1. Ve a Plugins → Añadir nuevo → Subir plugin"
-	@echo "  2. Selecciona el archivo: $(ZIP_FILE)"
-	@echo "  3. Haz clic en 'Instalar ahora'"
+	@echo "To install the plugin in WordPress:"
+	@echo "  1. Go to Plugins → Add New → Upload Plugin"
+	@echo "  2. Select the archive: $(ZIP_FILE)"
+	@echo "  3. Click 'Install Now'"
 
 # Clean build artifacts and local dependencies
 clean:
-	@echo "$(YELLOW)Limpiando archivos temporales...$(NC)"
+	@echo "$(YELLOW)Cleaning temporary files...$(NC)"
 	@rm -rf $(BUILD_DIR)
 	@rm -rf $(DIST_DIR)
 	@rm -rf $(SRC_DIR)/vendor
 	@rm -f $(SRC_DIR)/composer.lock
 	@rm -f $(SRC_DIR)/.phpunit.result.cache
-	@echo "$(GREEN)✓ Limpieza completada$(NC)"
+	@echo "$(GREEN)✓ Cleanup completed$(NC)"
 
-# Flujo completo: check + setup + build
+# Full flow: check + setup + build
 install: check setup build
 	@echo ""
-	@echo "$(GREEN)✓✓✓ Instalación completa exitosa ✓✓✓$(NC)"
+	@echo "$(GREEN)✓✓✓ Installation completed successfully ✓✓✓$(NC)"
 	@echo ""
-	@echo "El plugin está listo para instalar en WordPress."
-	@echo "Archivo generado: $(ZIP_FILE)"
+	@echo "The plugin is ready to be installed in WordPress."
+	@echo "Generated archive: $(ZIP_FILE)"
 
 # Run tests
 test: check
-	@echo "$(YELLOW)Ejecutando tests...$(NC)"
+	@echo "$(YELLOW)Running tests...$(NC)"
 	@echo ""
 	@if [ ! -d "$(SRC_DIR)/vendor" ]; then \
-		echo "$(RED)✗ Dependencias no instaladas. Ejecuta 'make setup' primero$(NC)"; \
+		echo "$(RED)✗ Dependencies are not installed. Run 'make setup' first$(NC)"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(SRC_DIR)/vendor/bin/phpunit" ]; then \
-		echo "$(YELLOW)Instalando dependencias de desarrollo...$(NC)"; \
+		echo "$(YELLOW)Installing development dependencies...$(NC)"; \
 		composer install --working-dir=$(SRC_DIR); \
 	fi
 	$(SRC_DIR)/vendor/bin/phpunit --configuration $(SRC_DIR)/phpunit.xml
 	@echo ""
-	@echo "$(GREEN)✓ Tests completados$(NC)"
+	@echo "$(GREEN)✓ Tests completed$(NC)"
 
 # ============================================================================
 # AWS CloudFormation Deployment Targets

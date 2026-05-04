@@ -176,13 +176,13 @@ class Plugin {
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('wp_ec2_backoffice_nonce'),
                 'strings' => array(
-                    'starting' => __('Iniciando instancia...', 'wp-ec2-backoffice-plugin'),
-                    'stopping' => __('Deteniendo instancia...', 'wp-ec2-backoffice-plugin'),
-                    'testing' => __('Probando conexión...', 'wp-ec2-backoffice-plugin'),
-                    'loading' => __('Cargando...', 'wp-ec2-backoffice-plugin'),
+                    'starting' => __('Starting instance...', 'wp-ec2-backoffice-plugin'),
+                    'stopping' => __('Stopping instance...', 'wp-ec2-backoffice-plugin'),
+                    'testing' => __('Testing connection...', 'wp-ec2-backoffice-plugin'),
+                    'loading' => __('Loading...', 'wp-ec2-backoffice-plugin'),
                     'error' => __('Error', 'wp-ec2-backoffice-plugin'),
-                    'success' => __('Éxito', 'wp-ec2-backoffice-plugin'),
-                    'copied' => __('Copiado al portapapeles', 'wp-ec2-backoffice-plugin'),
+                    'success' => __('Success', 'wp-ec2-backoffice-plugin'),
+                    'copied' => __('Copied to clipboard', 'wp-ec2-backoffice-plugin'),
                 )
             )
         );

@@ -71,7 +71,7 @@ class Security_Group_Manager {
             if (empty($current_ip)) {
                 return array(
                     'success' => false,
-                    'error' => __('No se pudo determinar la dirección IP actual', 'wp-ec2-backoffice-plugin'),
+                    'error' => __('Could not determine the current IP address.', 'wp-ec2-backoffice-plugin'),
                 );
             }
 
@@ -81,7 +81,7 @@ class Security_Group_Manager {
             if (empty($security_group_id)) {
                 return array(
                     'success' => false,
-                    'error' => __('No se pudo obtener el ID del grupo de seguridad', 'wp-ec2-backoffice-plugin'),
+                    'error' => __('Could not determine the security group ID.', 'wp-ec2-backoffice-plugin'),
                 );
             }
 
@@ -98,7 +98,7 @@ class Security_Group_Manager {
                     'security_group_id' => $security_group_id,
                     'ip_address' => $current_ip,
                     'message' => sprintf(
-                        __('Regla RDP actualizada para IP %s', 'wp-ec2-backoffice-plugin'),
+                        __('Updated the RDP rule for IP %s.', 'wp-ec2-backoffice-plugin'),
                         $current_ip
                     ),
                 ),
@@ -142,14 +142,14 @@ class Security_Group_Manager {
         $reservations = $result->get('Reservations');
         
         if (empty($reservations) || !isset($reservations[0]['Instances'][0])) {
-            throw new \Exception(__('Instancia no encontrada', 'wp-ec2-backoffice-plugin'));
+            throw new \Exception(__('Instance not found.', 'wp-ec2-backoffice-plugin'));
         }
 
         $instance = $reservations[0]['Instances'][0];
         
         // Get security groups
         if (empty($instance['SecurityGroups']) || !isset($instance['SecurityGroups'][0]['GroupId'])) {
-            throw new \Exception(__('No se encontraron grupos de seguridad en la instancia', 'wp-ec2-backoffice-plugin'));
+            throw new \Exception(__('No security groups were found on the instance.', 'wp-ec2-backoffice-plugin'));
         }
 
         // Return the first security group ID
@@ -178,7 +178,7 @@ class Security_Group_Manager {
         $security_groups = $result->get('SecurityGroups');
         
         if (empty($security_groups) || !isset($security_groups[0])) {
-            throw new \Exception(__('Grupo de seguridad no encontrado', 'wp-ec2-backoffice-plugin'));
+            throw new \Exception(__('Security group not found.', 'wp-ec2-backoffice-plugin'));
         }
 
         $security_group = $security_groups[0];
@@ -302,7 +302,7 @@ class Security_Group_Manager {
 
         // Verify configuration is available
         if (empty($config)) {
-            throw new \Exception(__('Configuración de AWS no encontrada. Por favor configura el plugin primero.', 'wp-ec2-backoffice-plugin'));
+            throw new \Exception(__('AWS configuration not found. Please configure the plugin first.', 'wp-ec2-backoffice-plugin'));
         }
 
         // Verify required fields are present
@@ -310,7 +310,7 @@ class Security_Group_Manager {
         foreach ($required_fields as $field) {
             if (empty($config[$field])) {
                 throw new \Exception(sprintf(
-                    __('Falta el campo de configuración requerido: %s', 'wp-ec2-backoffice-plugin'),
+                    __('Missing required configuration field: %s', 'wp-ec2-backoffice-plugin'),
                     $field
                 ));
             }
@@ -333,7 +333,7 @@ class Security_Group_Manager {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('WP EC2 Backoffice: Failed to initialize EC2 client: ' . $e->getMessage());
             }
-            throw new \Exception(__('Error al inicializar el cliente AWS EC2: ', 'wp-ec2-backoffice-plugin') . $e->getMessage());
+            throw new \Exception(__('Failed to initialize the AWS EC2 client: ', 'wp-ec2-backoffice-plugin') . $e->getMessage());
         }
     }
 
@@ -362,12 +362,12 @@ class Security_Group_Manager {
 
         // Map common AWS error codes to user-friendly messages
         $user_friendly_messages = array(
-            'InvalidClientTokenId' => __('Credenciales de AWS inválidas. Por favor verifica tu Access Key ID.', 'wp-ec2-backoffice-plugin'),
-            'SignatureDoesNotMatch' => __('Credenciales de AWS inválidas. Por favor verifica tu Secret Access Key.', 'wp-ec2-backoffice-plugin'),
-            'UnauthorizedOperation' => __('Permisos insuficientes. Por favor verifica tu política IAM.', 'wp-ec2-backoffice-plugin'),
-            'InvalidInstanceID.NotFound' => __('Instancia EC2 no encontrada. Por favor verifica tu Instance ID.', 'wp-ec2-backoffice-plugin'),
-            'InvalidGroup.NotFound' => __('Grupo de seguridad no encontrado.', 'wp-ec2-backoffice-plugin'),
-            'RequestLimitExceeded' => __('Límite de solicitudes de AWS excedido. Por favor intenta de nuevo en unos momentos.', 'wp-ec2-backoffice-plugin'),
+            'InvalidClientTokenId' => __('Invalid AWS credentials. Please verify your access key ID.', 'wp-ec2-backoffice-plugin'),
+            'SignatureDoesNotMatch' => __('Invalid AWS credentials. Please verify your secret access key.', 'wp-ec2-backoffice-plugin'),
+            'UnauthorizedOperation' => __('Insufficient permissions. Please verify the IAM policy.', 'wp-ec2-backoffice-plugin'),
+            'InvalidInstanceID.NotFound' => __('EC2 instance not found. Please verify the instance ID.', 'wp-ec2-backoffice-plugin'),
+            'InvalidGroup.NotFound' => __('Security group not found.', 'wp-ec2-backoffice-plugin'),
+            'RequestLimitExceeded' => __('AWS request limit exceeded. Please try again in a few moments.', 'wp-ec2-backoffice-plugin'),
         );
 
         // Use user-friendly message if available, otherwise use AWS message
@@ -382,3 +382,4 @@ class Security_Group_Manager {
         );
     }
 }
+
