@@ -248,8 +248,11 @@
             e.preventDefault();
             
             // Create a form and submit it to trigger download
-            const nonce = $('#ec2-ajax-nonce').val();
-            const url = wpEc2Backoffice.ajaxUrl + '?action=ec2_download_rdp&nonce=' + nonce;
+            const params = new URLSearchParams({
+                action: 'ec2_download_rdp',
+                nonce: $('#ec2-ajax-nonce').val()
+            });
+            const url = wpEc2Backoffice.ajaxUrl + '?' + params.toString();
             
             // Open in new window to trigger download
             window.location.href = url;
