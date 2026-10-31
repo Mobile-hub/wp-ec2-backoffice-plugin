@@ -13,7 +13,7 @@
         "aws/aws-sdk-php": "^3.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.0",
+        "phpunit/phpunit": "^13.4",
         "giorgiosironi/eris": "^1.2"
     },
     "autoload": {
